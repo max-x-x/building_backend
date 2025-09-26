@@ -27,6 +27,7 @@ include(
     'components/auth.py',
     'components/static.py',
     'components/drf.py',
+    'components/jwt.py',
 )
 
 ROOT_URLCONF = 'config.urls'
