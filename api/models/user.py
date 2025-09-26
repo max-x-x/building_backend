@@ -7,6 +7,8 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 
+from api.models.timestamp import TimeStampedMixin
+
 
 class Roles(models.TextChoices):
     ADMIN = "admin", "Администратор"
@@ -80,7 +82,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return f"{self.email} ({self.role})"
 
 
-class RefreshToken(models.Model):
+class RefreshToken(TimeStampedMixin):
     """
     Refresh-токены с возможностью ревокации (logout).
     """
@@ -95,7 +97,6 @@ class RefreshToken(models.Model):
     token = models.TextField("Токен (или хэш)")
     user_agent = models.CharField("User-Agent", max_length=256, blank=True)
     ip = models.GenericIPAddressField("IP", null=True, blank=True)
-    created_at = models.DateTimeField("Создан", default=timezone.now)
     expires_at = models.DateTimeField("Истекает")
     revoked = models.BooleanField("Отозван", default=False)
 
@@ -112,7 +113,7 @@ def _invite_expires_default():
     return timezone.now() + timedelta(days=14)
 
 
-class Invitation(models.Model):
+class Invitation(TimeStampedMixin):
     """
     Инвайт по email под конкретную роль (для онбординга).
     """
@@ -127,7 +128,6 @@ class Invitation(models.Model):
         null=True,
         blank=True,
     )
-    created_at = models.DateTimeField("Создан", default=timezone.now)
     expires_at = models.DateTimeField("Истекает", default=_invite_expires_default)
     accepted_at = models.DateTimeField("Принят", null=True, blank=True)
 
