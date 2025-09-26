@@ -1,3 +1,4 @@
+from secrets import token_urlsafe
 from uuid import UUID
 
 from django.db.models import Q
@@ -92,7 +93,7 @@ class UsersListCreateView(APIView):
         phone = ser.validated_data.get("phone", "")
         full_name = ser.validated_data.get("full_name", "")
 
-        temp_password = User.objects.make_random_password()
+        temp_password = token_urlsafe(12)
         user = User.objects.create_user(
             email=email,
             password=temp_password,
