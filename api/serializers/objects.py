@@ -70,3 +70,8 @@ class ObjectAssignForemanSerializer(serializers.Serializer):
         obj.foreman = self.validated_data["foreman"]
         obj.save(update_fields=["foreman"])
         return obj
+
+class ObjectShortSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConstructionObject
+        fields = ("id", "uuid_obj", "name", "address")

@@ -7,6 +7,36 @@ from api.serializers.objects import (ObjectCreateSerializer, ObjectOutSerializer
                                      ObjectsListOutSerializer)
 from api.models.object import ConstructionObject
 
+
+def _visible_object_ids_for_user(user):
+    """
+    Возвращает queryset id объектов, доступных пользователю по роли.
+    """
+    if user.role == Roles.ADMIN:
+        return ConstructionObject.objects.values_list("id", flat=True)
+
+    if user.role == Roles.SSK:
+        return ConstructionObject.objects.filter(ssk=user).values_list("id", flat=True)
+
+    if user.role == Roles.IKO:
+        return ConstructionObject.objects.filter(iko=user).values_list("id", flat=True)
+
+    # foreman
+    return ConstructionObject.objects.filter(foreman=user).values_list("id", flat=True)
+
+def _paginated(qs, request, default_limit=20, max_limit=200):
+    try:
+        limit = max(1, min(int(request.query_params.get("limit", default_limit)), max_limit))
+    except ValueError:
+        limit = default_limit
+    try:
+        offset = max(0, int(request.query_params.get("offset", 0)))
+    except ValueError:
+        offset = 0
+    total = qs.count()
+    return qs[offset: offset + limit], total
+
+
 class ObjectsListCreateView(APIView):
     """
     GET  /api/v1/objects   — список объектов
