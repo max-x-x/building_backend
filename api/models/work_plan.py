@@ -61,3 +61,38 @@ class ScheduleItem(TimeStampedMixin):
 
     def __str__(self):
         return f"{self.work_item.name} [{self.planned_start} — {self.planned_end}]"
+
+
+class WorkPlanVersion(TimeStampedMixin):
+    uuid_wp_version = models.UUIDField("UUID версии перечня", default=uuid.uuid4, editable=False)
+    plan = models.ForeignKey(WorkPlan, verbose_name="Перечень работ", on_delete=models.CASCADE, related_name="versions")
+    version = models.PositiveIntegerField("№ версии")
+    doc_url = models.URLField("URL документа")
+
+    class Meta:
+        verbose_name = "Версия перечня работ"
+        verbose_name_plural = "Версии перечня работ"
+        unique_together = ("plan", "version")
+        ordering = ["-version"]
+
+    def __str__(self):
+        return f"WP#{self.plan_id} v{self.version}"
+
+
+class WorkPlanChangeRequest(TimeStampedMixin):
+    STATUS = (("pending", "Ожидает"), ("approved", "Принято"), ("rejected", "Отклонено"))
+    uuid_wp_change = models.UUIDField("UUID заявки на изменение", default=uuid.uuid4, editable=False)
+    plan = models.ForeignKey(WorkPlan, verbose_name="Перечень работ", on_delete=models.CASCADE, related_name="change_requests")
+    proposed_doc_url = models.URLField("Предлагаемый документ")
+    comment = models.TextField("Комментарий", blank=True)
+    status = models.CharField("Статус", max_length=16, choices=STATUS, default="pending")
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Кто запросил", on_delete=models.PROTECT, related_name="+")
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Кто принял решение", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        verbose_name = "Заявка на изменение перечня"
+        verbose_name_plural = "Заявки на изменения перечня"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Change WP#{self.plan_id} [{self.status}]"

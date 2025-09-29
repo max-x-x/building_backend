@@ -1,0 +1,1775 @@
+openapi: 3.0.3
+info:
+  title: Construction QC Platform API
+  version: "1.0.0"
+  description: >
+    Backend API for SSK/IKO/Foreman/Admin flows: onboarding by invite, objects, activations,
+    visits & QR, prescriptions (violations), daily checklists, documents (and exec-docs),
+    work plans with versions and change requests, deliveries/invoices/labs, works, memos, tickets, notifications.
+
+servers:
+  - url: https://api.example.com/api/v1
+    description: Production
+  - url: http://localhost:8000/api/v1
+    description: Local
+
+tags:
+  - name: Auth
+  - name: Users
+  - name: Foremen
+  - name: Objects
+  - name: Activation
+  - name: Visits & QR
+  - name: Prescriptions & Violations
+  - name: Daily Checklists
+  - name: Documents
+  - name: Work Plans
+  - name: Deliveries & Invoices & Labs
+  - name: Works
+  - name: Memos
+  - name: Tickets
+  - name: Notifications
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ==== COMMON / USERS ====
+    Role:
+      type: string
+      enum: [admin, ssk, iko, foreman]
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        full_name: { type: string }
+        phone: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+
+    UsersList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/User' }
+        total: { type: integer }
+
+    # ==== OBJECTS ====
+    ConstructionObject:
+      type: object
+      properties:
+        id: { type: integer }
+        uuid_obj: { type: string, format: uuid }
+        name: { type: string }
+        address: { type: string }
+        ssk: { $ref: '#/components/schemas/User' }
+        foreman: { $ref: '#/components/schemas/User' }
+        iko: { $ref: '#/components/schemas/User' }
+        can_proceed: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    ObjectsList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ConstructionObject' }
+        total: { type: integer }
+
+    ObjectPatch:
+      type: object
+      properties:
+        foreman_id: { type: string, format: uuid, nullable: true }
+        ssk_id: { type: string, format: uuid, nullable: true }
+        primary_iko_id: { type: string, format: uuid, nullable: true }
+        coordinates_id: { type: integer, nullable: true }
+        can_continue_construction: { type: boolean }
+
+    # ==== AUTH ====
+    LoginIn:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+    LoginOut:
+      type: object
+      properties:
+        access: { type: string }
+        refresh: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+    RefreshIn:
+      type: object
+      required: [refresh]
+      properties:
+        refresh: { type: string }
+    RefreshOut:
+      type: object
+      properties:
+        access: { type: string }
+        refresh: { type: string }
+    InviteIn:
+      type: object
+      required: [email, role]
+      properties:
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/Role' }
+    InviteOut:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/Role' }
+    LogoutIn:
+      type: object
+      required: [refresh]
+      properties:
+        refresh: { type: string }
+    RegisterByInviteIn:
+      type: object
+      required: [token, email, full_name, password1, password2]
+      properties:
+        token: { type: string, format: uuid }
+        email: { type: string, format: email }
+        full_name: { type: string }
+        phone: { type: string }
+        password1: { type: string, format: password, minLength: 8 }
+        password2: { type: string, format: password, minLength: 8 }
+
+    # ==== ACTIVATION ====
+    ActivationRequestIn:
+      type: object
+      properties:
+        ssk_checklist: { type: object, additionalProperties: true }
+        ssk_checklist_pdf: { type: string, format: uri }
+    Activation:
+      type: object
+      properties:
+        id: { type: integer }
+        uuid_activation: { type: string, format: uuid }
+        object: { type: integer }
+        status: { type: string, enum: [requested, visit_planned, checked, approved, rejected] }
+        requested_by: { type: string, format: uuid }
+        ssk_checklist: { type: object }
+        ssk_checklist_pdf: { type: string, format: uri }
+        requested_at: { type: string, format: date-time }
+        iko_checklist: { type: object }
+        iko_checklist_pdf: { type: string, format: uri }
+        iko_has_violations: { type: boolean }
+        iko_checked_at: { type: string, format: date-time }
+        approved_at: { type: string, format: date-time }
+        rejected_reason: { type: string }
+
+    IkoCheckIn:
+      type: object
+      properties:
+        iko_has_violations: { type: boolean }
+        iko_checklist: { type: object }
+        iko_checklist_pdf: { type: string, format: uri }
+        rejected_reason: { type: string }
+
+    # ==== VISITS & QR ====
+    VisitRequest:
+      type: object
+      properties:
+        id: { type: integer }
+        uuid_visit: { type: string, format: uuid }
+        object: { $ref: '#/components/schemas/ConstructionObject' }
+        requested_by: { type: string, format: uuid }
+        planned_at: { type: string, format: date-time }
+        status: { type: string, enum: [pending, qr_assigned, done, cancelled] }
+        created_at: { type: string, format: date-time }
+    VisitRequestCreate:
+      type: object
+      required: [object]
+      properties:
+        object: { type: integer }
+        planned_at: { type: string, format: date-time }
+    QrCode:
+      type: object
+      properties:
+        id: { type: integer }
+        uuid_qr: { type: string, format: uuid }
+        object: { type: integer }
+        user: { type: string, format: uuid }
+        token: { type: string, format: uuid }
+        valid_from: { type: string, format: date-time }
+        valid_to: { type: string, format: date-time }
+        geojson: { type: object }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    QrCreateIn:
+      type: object
+      required: [object, user, valid_from, valid_to]
+      properties:
+        object: { type: integer }
+        user: { type: string, format: uuid }
+        valid_from: { type: string, format: date-time }
+        valid_to: { type: string, format: date-time }
+        geojson: { type: object }
+        visit_request_id: { type: integer }
+    QrScanIn:
+      type: object
+      required: [geo_point]
+      properties:
+        geo_point:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items: { type: number }
+        timestamp: { type: string }
+    QrScanOut:
+      type: object
+      properties:
+        upload_url: { type: string, format: uri }
+        session_id: { type: string, format: uuid }
+    QrUploadCompleteIn:
+      type: object
+      required: [session_id]
+      properties:
+        session_id: { type: string, format: uuid }
+
+    # ==== PRESCRIPTIONS / VIOLATIONS ====
+    Prescription:
+      type: object
+      properties:
+        id: { type: integer }
+        uuid_prescription: { type: string, format: uuid }
+        object: { $ref: '#/components/schemas/ConstructionObject' }
+        author: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        requires_stop: { type: boolean }
+        requires_personal_recheck: { type: boolean }
+        attachments:
+          type: array
+          items: { type: string, format: uri }
+        status: { type: string, enum: [open, awaiting_verification, closed] }
+        created_at: { type: string, format: date-time }
+        closed_at: { type: string, format: date-time }
+    PrescriptionCreate:
+      type: object
+      required: [object, title]
+      properties:
+        object: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        requires_stop: { type: boolean }
+        requires_personal_recheck: { type: boolean }
+        attachments:
+          type: array
+          items: { type: string, format: uri }
+    PrescriptionFixIn:
+      type: object
+      required: [comment, attachments]
+      properties:
+        comment: { type: string }
+        attachments:
+          type: array
+          items: { type: string, format: uri }
+    PrescriptionVerifyIn:
+      type: object
+      required: [accepted]
+      properties:
+        accepted: { type: boolean }
+        comment: { type: string }
+    PrescriptionsList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Prescription' }
+        total: { type: integer }
+
+    # ==== DAILY CHECKLISTS ====
+    DailyChecklist:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        uuid_daily: { type: string, format: uuid }
+        object: { type: integer }
+        author: { type: string, format: uuid }
+        data: { type: object }
+        pdf_url: { type: string, format: uri }
+        photos_folder_url: { type: string, format: uri }
+        status: { type: string, enum: [submitted, approved, rejected] }
+        reviewed_by: { type: string, format: uuid }
+        reviewed_at: { type: string, format: date-time }
+        review_comment: { type: string }
+        created_at: { type: string, format: date-time }
+    DailyChecklistCreate:
+      type: object
+      required: [object_id, data, pdf_url]
+      properties:
+        object_id: { type: integer }
+        data: { type: object }
+        pdf_url: { type: string, format: uri }
+        photos_folder_url: { type: string, format: uri }
+    DailyChecklistPatch:
+      type: object
+      properties:
+        data: { type: object }
+        pdf_url: { type: string, format: uri }
+        photos_folder_url: { type: string, format: uri }
+    DailyChecklistsList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/DailyChecklist' }
+        total: { type: integer }
+    DailyChecklistReviewIn:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject]
+        comment: { type: string }
+
+    # ==== DOCUMENTS ====
+    DocumentFile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        uuid_document: { type: string, format: uuid }
+        object: { type: integer }
+        folder: { type: string, format: uuid, nullable: true }
+        name: { type: string }
+        url: { type: string, format: uri }
+        size_bytes: { type: integer }
+        content_type: { type: string }
+        created_at: { type: string, format: date-time }
+    DocumentsList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/DocumentFile' }
+        total: { type: integer }
+    ExecDoc:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        uuid_execdoc: { type: string, format: uuid }
+        object: { type: integer }
+        kind: { type: string, enum: [general, activation, completion, other] }
+        pdf_url: { type: string, format: uri }
+        created_by: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+    ExecDocCreate:
+      type: object
+      required: [object_id, kind, pdf_url]
+      properties:
+        object_id: { type: integer }
+        kind: { type: string, enum: [general, activation, completion, other] }
+        pdf_url: { type: string, format: uri }
+    ExecDocsList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ExecDoc' }
+        total: { type: integer }
+
+    # ==== WORK PLANS ====
+    WorkPlan:
+      type: object
+      properties:
+        id: { type: integer }
+        uuid_wp: { type: string, format: uuid }
+        object: { type: integer }
+        title: { type: string }
+        created_by: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        versions:
+          type: array
+          items: { $ref: '#/components/schemas/WorkPlanVersion' }
+    WorkPlanCreate:
+      type: object
+      required: [object_id, items]
+      properties:
+        object_id: { type: string, format: uuid }
+        title: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            required: [name, start_date, end_date]
+            properties:
+                name: { type: string }
+                quantity: { type: number }
+                unit: { type: string }
+                start_date: { type: string, format: date }
+                end_date: { type: string, format: date }
+                document_url: { type: string, format: uri }
+    WorkPlanVersion:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        uuid_wp_version: { type: string, format: uuid }
+        version: { type: integer }
+        doc_url: { type: string, format: uri }
+        created_at: { type: string, format: date-time }
+    WPVersionCreate:
+      type: object
+      required: [doc_url]
+      properties:
+        doc_url: { type: string, format: uri }
+    WPChangeRequestCreate:
+      type: object
+      required: [proposed_doc_url]
+      properties:
+        proposed_doc_url: { type: string, format: uri }
+        comment: { type: string }
+    WPChangeDecision:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approve, reject] }
+        comment: { type: string }
+    WorkPlansList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/WorkPlan' }
+        total: { type: integer }
+
+    # ==== DELIVERIES / INVOICES / LABS ====
+    Delivery:
+      type: object
+      properties:
+        id: { type: integer }
+        uuid_delivery: { type: string, format: uuid }
+        object: { type: integer }
+        planned_date: { type: string, format: date }
+        notes: { type: string }
+        status: { type: string, enum: [scheduled, received, accepted, rejected, sent_to_lab, awaiting_lab] }
+        created_by: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+    DeliveryCreate:
+      type: object
+      required: [object_id]
+      properties:
+        object_id: { type: integer }
+        planned_date: { type: string, format: date }
+        notes: { type: string }
+    DeliveryReceive:
+      type: object
+      required: [object_id]
+      properties:
+        object_id: { type: integer }
+        notes: { type: string }
+    DeliveriesList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Delivery' }
+        total: { type: integer }
+    InvoiceCreate:
+      type: object
+      required: [object_id, pdf_url]
+      properties:
+        object_id: { type: integer }
+        delivery_id: { type: integer }
+        delivery_uuid: { type: string, format: uuid }
+        pdf_url: { type: string, format: uri }
+        data: { type: object }
+    InvoiceParseIn:
+      type: object
+      required: [image_urls]
+      properties:
+        image_urls:
+          type: array
+          items: { type: string, format: uri }
+    DeliverySetStatus:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [accepted, rejected, sent_to_lab, awaiting_lab] }
+        comment: { type: string }
+    LabOrderCreate:
+      type: object
+      required: [items]
+      properties:
+        delivery_id: { type: integer }
+        delivery_uuid: { type: string, format: uuid }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              invoice_item_id: { type: string }
+              sample_code: { type: string }
+        lab_id: { type: string }
+    LabOrderCreateOut:
+      type: object
+      properties:
+        order_id: { type: integer }
+        uuid_lab_order: { type: string, format: uuid }
+        status: { type: string }
+
+    # ==== WORKS ====
+    Work:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        uuid_work: { type: string, format: uuid }
+        object: { type: integer }
+        title: { type: string }
+        status: { type: string, enum: [open, in_progress, done] }
+        responsible: { type: string, format: uuid }
+        reviewer: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+    WorkCreate:
+      type: object
+      required: [object_id, responsible_id, reviewer_id, title, status]
+      properties:
+        object_id: { type: integer }
+        responsible_id: { type: string, format: uuid }
+        reviewer_id: { type: string, format: uuid }
+        title: { type: string }
+        status: { type: string, enum: [open, in_progress, done] }
+    WorksList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Work' }
+        total: { type: integer }
+
+    # ==== MEMOS ====
+    Memo:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        uuid_memo: { type: string, format: uuid }
+        title: { type: string }
+        pdf_url: { type: string, format: uri }
+        created_at: { type: string, format: date-time }
+    MemosList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Memo' }
+        total: { type: integer }
+
+    # ==== TICKETS ====
+    Ticket:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        uuid_ticket: { type: string, format: uuid }
+        author: { type: string, format: uuid }
+        object: { type: integer, nullable: true }
+        text: { type: string }
+        status: { type: string, enum: [open, in_progress, done] }
+        created_at: { type: string, format: date-time }
+    TicketsList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Ticket' }
+        total: { type: integer }
+    TicketCreate:
+      type: object
+      required: [text]
+      properties:
+        object_id: { type: integer }
+        text: { type: string }
+    TicketStatusIn:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [open, in_progress, done] }
+
+    # ==== NOTIFICATIONS ====
+    Notification:
+      type: object
+      properties:
+        id: { type: integer }
+        uuid_notification: { type: string, format: uuid }
+        object: { type: integer }
+        to_user: { type: string, format: uuid }
+        to_role: { $ref: '#/components/schemas/Role' }
+        type: { type: string }
+        payload: { type: object }
+        is_read: { type: boolean }
+        created_at: { type: string, format: date-time }
+    NotificationsList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Notification' }
+        total: { type: integer }
+    NotificationSendIn:
+      type: object
+      required: [channel, title, body]
+      properties:
+        user_id: { type: string, format: uuid }
+        role: { $ref: '#/components/schemas/Role' }
+        object_id: { type: integer }
+        channel: { type: string, enum: [email, sms, push] }
+        title: { type: string }
+        body: { type: string }
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ===== AUTH =====
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email/password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginIn' }
+            examples:
+              default:
+                value: { email: user@example.com, password: "secret123" }
+      responses:
+        '200':
+          description: JWT tokens and user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginOut' }
+        '401': { description: Invalid credentials }
+      security: []  # public
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate refresh token and issue new access/refresh
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshIn' }
+      responses:
+        '200':
+          description: New tokens
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RefreshOut' }
+      security: []  # public
+  /auth/invite:
+    post:
+      tags: [Auth]
+      summary: Admin invites user (sends email with registration link)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InviteIn' }
+      responses:
+        '201':
+          description: Invited (or role updated)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InviteOut' }
+  /auth/register-by-invite:
+    post:
+      tags: [Auth]
+      summary: Register user by invitation token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterByInviteIn' }
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+      security: []  # public
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke refresh token (logout)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LogoutIn' }
+      responses:
+        '204': { description: Logged out }
+
+  # ===== USERS =====
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Current user profile
+      responses:
+        '200':
+          description: Me
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+  /users:
+    get:
+      tags: [Users]
+      summary: Admin - list users
+      parameters:
+        - in: query
+          name: role
+          schema:
+            $ref: '#/components/schemas/Role'
+        - in: query
+          name: query
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Users page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsersList' }
+    post:
+      tags: [Users]
+      summary: Admin - create user (temporary password emailed)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { $ref: '#/components/schemas/Role' }
+                phone: { type: string }
+                full_name: { type: string }
+      responses:
+        '201':
+          description: Created user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user (self or admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '403': { description: Forbidden }
+        '404': { description: Not found }
+    patch:
+      tags: [Users]
+      summary: Patch user (self limited, admin full)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email }
+                role: { $ref: '#/components/schemas/Role' }
+                phone: { type: string }
+                full_name: { type: string }
+                is_active: { type: boolean }
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+
+  # ===== FOREMEN =====
+  /foremen:
+    get:
+      tags: [Foremen]
+      summary: List all foremen
+      parameters:
+        - in: query
+          name: query
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Foremen list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsersList' }
+
+  # ===== OBJECTS & ACTIVATION =====
+  /objects:
+    get:
+      tags: [Objects]
+      summary: List objects (by role visibility)
+      parameters:
+        - in: query
+          name: query
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: mine
+          schema: { type: string, enum: ["1","true","True","0","false","False"] }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Objects page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ObjectsList' }
+    post:
+      tags: [Objects]
+      summary: Admin - create object
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                address: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConstructionObject' }
+  /objects/{id}:
+    get:
+      tags: [Objects]
+      summary: Object details (access by role)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Object
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConstructionObject' }
+        '403': { description: Forbidden }
+        '404': { description: Not found }
+    patch:
+      tags: [Objects]
+      summary: Patch object (roles admin/ssk)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ObjectPatch' }
+      responses:
+        '200':
+          description: Updated object
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConstructionObject' }
+  /objects/{id}/activation/request:
+    post:
+      tags: [Activation]
+      summary: SSK/Admin request object activation
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActivationRequestIn' }
+      responses:
+        '201':
+          description: Activation request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Activation' }
+  /objects/{id}/activation/iko-check:
+    post:
+      tags: [Activation]
+      summary: IKO/Admin submit activation check result
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IkoCheckIn' }
+      responses:
+        '200':
+          description: Activation updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Activation' }
+  /objects/{id}/suspend:
+    post:
+      tags: [Objects]
+      summary: SSK/IKO suspend object (stop works)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Suspended }
+  /objects/{id}/resume:
+    post:
+      tags: [Objects]
+      summary: SSK/IKO resume object (allow works)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Resumed }
+  /objects/{id}/complete:
+    post:
+      tags: [Objects]
+      summary: IKO complete object
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Completed }
+
+  # ===== VISITS & QR =====
+  /visit-requests:
+    get:
+      tags: [Visits & QR]
+      summary: List visit requests (by visibility)
+      parameters:
+        - in: query
+          name: object_id
+          schema: { type: integer }
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending, qr_assigned, done, cancelled] }
+        - in: query
+          name: mine
+          schema: { type: string, enum: ["1","true","True","0","false","False"] }
+        - in: query
+          name: date_from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date-time }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Visit requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/VisitRequest' }
+                  total: { type: integer }
+    post:
+      tags: [Visits & QR]
+      summary: IKO/Admin create visit request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VisitRequestCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisitRequest' }
+  /visit-requests/{id}:
+    get:
+      tags: [Visits & QR]
+      summary: Visit request details (by role visibility)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Visit request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisitRequest' }
+        '404': { description: Not found }
+  /qr-codes:
+    post:
+      tags: [Visits & QR]
+      summary: Admin issues QR for a user/object (optionally binds VisitRequest)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QrCreateIn' }
+      responses:
+        '201':
+          description: QR created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QrCode' }
+  /qr-codes/{id}/scan:
+    post:
+      tags: [Visits & QR]
+      summary: Scan QR on site, validate geofence/time, return upload URL
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QrScanIn' }
+      responses:
+        '200':
+          description: Upload session created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QrScanOut' }
+  /qr-codes/{id}/upload-complete:
+    post:
+      tags: [Visits & QR]
+      summary: Seal WORM upload session
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QrUploadCompleteIn' }
+      responses:
+        '200': { description: Sealed }
+
+  # ===== PRESCRIPTIONS / VIOLATIONS =====
+  /prescriptions:
+    get:
+      tags: [Prescriptions & Violations]
+      summary: List prescriptions (filters & visibility)
+      parameters:
+        - in: query
+          name: object_id
+          schema: { type: integer }
+        - in: query
+          name: status
+          schema: { type: string, enum: [open, awaiting_verification, closed] }
+        - in: query
+          name: requires_stop
+          schema: { type: string, enum: ["1","true","True","0","false","False"] }
+        - in: query
+          name: author_role
+          schema: { $ref: '#/components/schemas/Role' }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Prescriptions page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrescriptionsList' }
+    post:
+      tags: [Prescriptions & Violations]
+      summary: Create prescription (IKO/SSK/Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrescriptionCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Prescription' }
+  /prescriptions/{id}:
+    get:
+      tags: [Prescriptions & Violations]
+      summary: Prescription detail (visibility by object)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Prescription
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Prescription' }
+        '404': { description: Not found }
+  /prescriptions/{id}/fix:
+    post:
+      tags: [Prescriptions & Violations]
+      summary: Foreman/Admin submit fix (comment+attachments)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrescriptionFixIn' }
+      responses:
+        '200':
+          description: Status moved to awaiting_verification
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Prescription' }
+  /prescriptions/{id}/verify:
+    post:
+      tags: [Prescriptions & Violations]
+      summary: Author (IKO/SSK/Admin) verifies fix (approve/reject)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrescriptionVerifyIn' }
+      responses:
+        '200':
+          description: Updated prescription
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Prescription' }
+  /violations:
+    get:
+      tags: [Prescriptions & Violations]
+      summary: Alias to prescriptions list (with only_open / requires_stop)
+      parameters:
+        - in: query
+          name: object_id
+          schema: { type: integer }
+        - in: query
+          name: only_open
+          schema: { type: string, enum: ["1","true","True","0","false","False"] }
+        - in: query
+          name: requires_stop
+          schema: { type: string, enum: ["1","true","True","0","false","False"] }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Violations list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrescriptionsList' }
+
+  # ===== DAILY CHECKLISTS =====
+  /daily-checklists:
+    get:
+      tags: [Daily Checklists]
+      summary: List daily checklists by visibility
+      parameters:
+        - in: query
+          name: object_id
+          schema: { type: integer }
+        - in: query
+          name: status
+          schema: { type: string, enum: [submitted, approved, rejected] }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Checklists page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyChecklistsList' }
+    post:
+      tags: [Daily Checklists]
+      summary: Foreman/Admin submit daily checklist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DailyChecklistCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyChecklist' }
+    patch:
+      tags: [Daily Checklists]
+      summary: Author can edit while status=submitted
+      parameters:
+        - in: query
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DailyChecklistPatch' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyChecklist' }
+  /daily-checklists/{id}/review:
+    post:
+      tags: [Daily Checklists]
+      summary: SSK/Admin review checklist (approve/reject)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DailyChecklistReviewIn' }
+      responses:
+        '200': { description: Reviewed }
+
+  # ===== DOCUMENTS =====
+  /documents:
+    get:
+      tags: [Documents]
+      summary: List files for an object
+      parameters:
+        - in: query
+          name: object_id
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Files page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentsList' }
+  /exec-docs:
+    get:
+      tags: [Documents]
+      summary: List exec-doc PDFs for an object
+      parameters:
+        - in: query
+          name: object_id
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Exec-docs page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExecDocsList' }
+    post:
+      tags: [Documents]
+      summary: Create exec-doc PDF record (SSK/IKO/Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExecDocCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExecDoc' }
+
+  # ===== WORK PLANS =====
+  /work-plans:
+    post:
+      tags: [Work Plans]
+      summary: SSK attaches initial work plan + generates schedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkPlanCreate' }
+      responses:
+        '201':
+          description: Created plan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkPlan' }
+  /work-plans/{id}:
+    get:
+      tags: [Work Plans]
+      summary: Work plan with versions
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Plan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkPlan' }
+  /work-plans/list:
+    get:
+      tags: [Work Plans]
+      summary: List work plans (filter by object_id)
+      parameters:
+        - in: query
+          name: object_id
+          schema: { type: integer }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Plans page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkPlansList' }
+  /work-plans/{id}/versions:
+    post:
+      tags: [Work Plans]
+      summary: SSK/Admin add new plan version
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WPVersionCreate' }
+      responses:
+        '201':
+          description: Version created
+  /work-plans/{id}/request-change:
+    post:
+      tags: [Work Plans]
+      summary: Foreman/Admin propose change with new document
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WPChangeRequestCreate' }
+      responses:
+        '202': { description: Pending review }
+  /work-plans/{id}/approve-change:
+    post:
+      tags: [Work Plans]
+      summary: SSK/Admin approve or reject change (auto-create version on approve)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WPChangeDecision' }
+      responses:
+        '200':
+          description: Decision result
+
+  # ===== DELIVERIES / INVOICES / LABS =====
+  /deliveries:
+    post:
+      tags: [Deliveries & Invoices & Labs]
+      summary: SSK/Admin create delivery (schedule)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliveryCreate' }
+      responses:
+        '201':
+          description: Delivery created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Delivery' }
+  /deliveries/{id}:
+    post:
+      tags: [Deliveries & Invoices & Labs]
+      summary: Foreman/Admin mark delivery received
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliveryReceive' }
+      responses:
+        '201':
+          description: Delivery updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Delivery' }
+  /deliveries/list:
+    get:
+      tags: [Deliveries & Invoices & Labs]
+      summary: List deliveries (visible objects)
+      parameters:
+        - in: query
+          name: object_id
+          schema: { type: integer }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Deliveries page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveriesList' }
+  /invoices:
+    post:
+      tags: [Deliveries & Invoices & Labs]
+      summary: Attach invoice/TTN to delivery (by id or uuid)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InvoiceCreate' }
+      responses:
+        '201':
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  uuid_invoice: { type: string, format: uuid }
+  /invoices/{id}/parse-ttn:
+    post:
+      tags: [Deliveries & Invoices & Labs]
+      summary: Parse TTN images to structured data (mock)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InvoiceParseIn' }
+      responses:
+        '200':
+          description: Parsed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+  /deliveries/{id}/status:
+    post:
+      tags: [Deliveries & Invoices & Labs]
+      summary: SSK/Admin set delivery status (accepted/rejected/sent_to_lab/awaiting_lab)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliverySetStatus' }
+      responses:
+        '200':
+          description: Delivery updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Delivery' }
+  /labs/orders:
+    post:
+      tags: [Deliveries & Invoices & Labs]
+      summary: SSK/Admin create lab order for delivery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LabOrderCreate' }
+      responses:
+        '201':
+          description: Lab order created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LabOrderCreateOut' }
+
+  # ===== WORKS =====
+  /works:
+    get:
+      tags: [Works]
+      summary: List works by object visibility
+      parameters:
+        - in: query
+          name: object_id
+          schema: { type: integer }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Works
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorksList' }
+    post:
+      tags: [Works]
+      summary: SSK/Admin create work task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkCreate' }
+      responses:
+        '201':
+          description: Work created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Work' }
+
+  # ===== MEMOS =====
+  /memos:
+    get:
+      tags: [Memos]
+      summary: List memos
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Memos
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemosList' }
+    post:
+      tags: [Memos]
+      summary: Admin create memo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, pdf_url]
+              properties:
+                title: { type: string }
+                pdf_url: { type: string, format: uri }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  uuid_memo: { type: string, format: uuid }
+
+  # ===== TICKETS =====
+  /tickets:
+    get:
+      tags: [Tickets]
+      summary: List tickets (author sees own; admin sees all)
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [open, in_progress, done] }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Tickets page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TicketsList' }
+    post:
+      tags: [Tickets]
+      summary: Create support ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TicketCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ticket' }
+  /tickets/{id}/status:
+    post:
+      tags: [Tickets]
+      summary: Admin set ticket status (by ticket UUID)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TicketStatusIn' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ticket' }
+
+  # ===== NOTIFICATIONS =====
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: My notifications
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Notifications page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationsList' }
+  /notifications/send:
+    post:
+      tags: [Notifications]
+      summary: Admin send notification (email/SMS/push)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationSendIn' }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queued: { type: boolean }
+                  id: { type: integer }

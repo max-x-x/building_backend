@@ -13,12 +13,10 @@ class Notification(TimeStampedMixin):
     TYPE = (
         ("activation_requested", "Запрошена активация"),
         ("iko_assigned", "Назначен ИКО"),
-        ("visit_action_needed", "Нужна заявка на посещение"),
-        ("qr_needed", "Нужен QR для визита"),
-        ("qr_assigned", "QR выдан"),
-        ("violations_found", "Найдены нарушения"),
-        ("prescription_fixed", "Исправление предписания"),
-        ("activation_approved", "Активация одобрена"),
+        ("status_changed", "Смена статуса объекта"),
+        ("suspended", "Объект приостановлен"),
+        ("resumed", "Объект возобновлён"),
+        ("completed", "Объект завершён"),
     )
 
     uuid_notification = models.UUIDField("UUID уведомления", default=uuid.uuid4, editable=False)

@@ -1,11 +1,12 @@
+from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 
 from api.models import Roles
 from api.serializers.objects import (ObjectCreateSerializer, ObjectOutSerializer, ObjectAssignForemanSerializer,
-                                     ObjectsListOutSerializer)
-from api.models.object import ConstructionObject
+                                     ObjectsListOutSerializer, ObjectPatchSerializer)
+from api.models.object import ConstructionObject, ObjectStatus
 
 
 def _visible_object_ids_for_user(user):
@@ -38,68 +39,126 @@ def _paginated(qs, request, default_limit=20, max_limit=200):
 
 
 class ObjectsListCreateView(APIView):
-    """
-    GET  /api/v1/objects   — список объектов
-    POST /api/v1/objects   — создать объект (с авто-назначением ССК)
-    Доступ:
-      - GET: любой аутентифицированный; видимость по роли:
-          admin  → все
-          ssk    → где он ssk
-          iko    → где он iko
-          foreman→ где он foreman
-      - POST: по бизнес-правилу (обычно admin). Оставлю без жёсткой блокировки, как у тебя было.
-    Фильтры GET: ?query=...&limit=20&offset=0
-    """
     def get(self, request):
         query = request.query_params.get("query")
-        try:
-            limit = max(1, min(int(request.query_params.get("limit", 20)), 200))
-        except ValueError:
-            limit = 20
-        try:
-            offset = max(0, int(request.query_params.get("offset", 0)))
-        except ValueError:
-            offset = 0
+        status_param = request.query_params.get("status")
+        mine = request.query_params.get("mine")
 
-        role = request.user.role
         qs = ConstructionObject.objects.select_related("ssk", "foreman", "iko").all()
 
-        if role == Roles.SSK:
+        # видимость по роли
+        if request.user.role == Roles.SSK:
             qs = qs.filter(ssk=request.user)
-        elif role == Roles.IKO:
+        elif request.user.role == Roles.IKO:
             qs = qs.filter(iko=request.user)
-        elif role == Roles.FOREMAN:
+        elif request.user.role == Roles.FOREMAN:
             qs = qs.filter(foreman=request.user)
-        # admin видит все
+        # admin видит всё
 
+        if status_param:
+            qs = qs.filter(status=status_param)
         if query:
             qs = qs.filter(Q(name__icontains=query) | Q(address__icontains=query))
+        if mine in {"1", "true", "True"}:
+            if request.user.role == Roles.ADMIN:
+                qs = qs.filter(created_by=request.user)  # для админа "мои" = я создал
 
-        total = qs.count()
-        items = list(qs.order_by("-created_at")[offset: offset + limit])
-        out = ObjectsListOutSerializer({"items": items, "total": total}, context={"request": request})
-        return Response(out.data, status=200)
+        page, total = _paginated(qs.order_by("-created_at"), request)
+        return Response(ObjectsListOutSerializer({"items": page, "total": total}).data, status=200)
 
     def post(self, request):
+        if request.user.role != Roles.ADMIN:
+            return Response({"detail": "Forbidden"}, status=403)
         ser = ObjectCreateSerializer(data=request.data, context={"request": request})
         ser.is_valid(raise_exception=True)
         obj = ser.save()
-        return Response(ObjectOutSerializer(obj, context={"request": request}).data, status=status.HTTP_201_CREATED)
+        return Response(ObjectOutSerializer(obj).data, status=status.HTTP_201_CREATED)
 
 
-class ObjectsAssignForemanView(APIView):
+class ObjectsDetailView(APIView):
     """
-    PATCH /api/v1/objects/{id}
-    Назначение: ССК (или admin) назначает прораба на объект.
-    Тело: { "foreman_id": "uuid" }
+    GET /objects/{id}
+    PATCH /objects/{id}
     """
-    def patch(self, request, id):
+    def get(self, request, id: int):
         try:
-            obj = ConstructionObject.objects.select_related("ssk", "foreman", "iko").get(uuid_obj=id)
+            obj = ConstructionObject.objects.select_related("ssk", "foreman", "iko").get(id=id)
         except ConstructionObject.DoesNotExist:
-            return Response({"detail": "Объект не найден"}, status=404)
+            return Response({"detail": "Not found"}, status=404)
 
-        ser = ObjectAssignForemanSerializer(data=request.data, context={"request": request, "object": obj})
+        allowed = (
+            request.user.role == Roles.ADMIN or
+            obj.ssk_id == request.user.id or
+            obj.iko_id == request.user.id or
+            obj.foreman_id == request.user.id
+        )
+        if not allowed:
+            return Response({"detail": "Forbidden"}, status=403)
+
+        return Response(ObjectOutSerializer(obj).data, status=200)
+
+    def patch(self, request, id: int):
+        try:
+            obj = ConstructionObject.objects.get(id=id)
+        except ConstructionObject.DoesNotExist:
+            return Response({"detail": "Not found"}, status=404)
+
+        ser = ObjectPatchSerializer(data=request.data, partial=True, context={"request": request, "object": obj})
         ser.is_valid(raise_exception=True)
         obj = ser.save()
         return Response(ObjectOutSerializer(obj).data, status=200)
+
+
+class ObjectSuspendView(APIView):
+    def post(self, request, id: int):
+        try:
+            obj = ConstructionObject.objects.get(id=id)
+        except ConstructionObject.DoesNotExist:
+            return Response({"detail": "Not found"}, status=404)
+
+        if request.user.role not in (Roles.IKO, Roles.SSK):
+            return Response({"detail": "Forbidden"}, status=403)
+        if request.user.role == Roles.SSK and obj.ssk_id != request.user.id:
+            return Response({"detail": "Forbidden"}, status=403)
+        if request.user.role == Roles.IKO and obj.iko_id != request.user.id:
+            return Response({"detail": "Forbidden"}, status=403)
+
+        obj.status = ObjectStatus.SUSPENDED
+        obj.can_proceed = False
+        obj.save(update_fields=["status", "can_proceed", "modified_at"])
+        return Response({"status": obj.status}, status=200)
+
+
+class ObjectResumeView(APIView):
+    def post(self, request, id: int):
+        try:
+            obj = ConstructionObject.objects.get(id=id)
+        except ConstructionObject.DoesNotExist:
+            return Response({"detail": "Not found"}, status=404)
+
+        if request.user.role not in (Roles.IKO, Roles.SSK):
+            return Response({"detail": "Forbidden"}, status=403)
+        if request.user.role == Roles.SSK and obj.ssk_id != request.user.id:
+            return Response({"detail": "Forbidden"}, status=403)
+        if request.user.role == Roles.IKO and obj.iko_id != request.user.id:
+            return Response({"detail": "Forbidden"}, status=403)
+
+        obj.status = ObjectStatus.ACTIVE
+        obj.can_proceed = True
+        obj.save(update_fields=["status", "can_proceed", "modified_at"])
+        return Response({"status": obj.status}, status=200)
+
+class ObjectCompleteView(APIView):
+    def post(self, request, id: int):
+        try:
+            obj = ConstructionObject.objects.get(id=id)
+        except ConstructionObject.DoesNotExist:
+            return Response({"detail": "Not found"}, status=404)
+
+        if request.user.role != Roles.IKO or obj.iko_id != request.user.id:
+            return Response({"detail": "Only assigned IKO can complete"}, status=403)
+
+        obj.status = ObjectStatus.COMPLETED
+        obj.can_proceed = False
+        obj.save(update_fields=["status", "can_proceed", "modified_at"])
+        return Response({"status": obj.status}, status=200)

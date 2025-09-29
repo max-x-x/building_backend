@@ -6,10 +6,20 @@ from django.conf import settings
 from api.models.timestamp import TimeStampedMixin
 from api.models.user import User  # твой кастомный юзер
 
+class ObjectStatus(models.TextChoices):
+    DRAFT = "draft", "Черновик"
+    ACTIVATION_PENDING = "activation_pending", "Ожидает активации"
+    ACTIVE = "active", "Активен"
+    SUSPENDED = "suspended", "Приостановлен"
+    COMPLETED = "completed", "Завершён"
+
 class ConstructionObject(TimeStampedMixin):
     uuid_obj = models.UUIDField("ID", default=uuid.uuid4, editable=False)
     name = models.CharField("Название объекта", max_length=255)
     address = models.CharField("Адрес", max_length=500, blank=True)
+    status = models.CharField(
+        "Статус", max_length=32, choices=ObjectStatus.choices, default=ObjectStatus.DRAFT
+    )
     ssk = models.ForeignKey(
         settings.AUTH_USER_MODEL, verbose_name="ССК",
         on_delete=models.PROTECT, related_name="ssk_objects"
@@ -74,3 +84,31 @@ class ObjectActivation(TimeStampedMixin):
 
     def __str__(self):
         return f"Activation[{self.pk}] {self.object.name} — {self.get_status_display()}"
+
+
+class ObjectRoleAudit(TimeStampedMixin):
+    """
+    Аудит смены ответственных по объекту.
+    """
+    FIELD = (
+        ("ssk", "ССК"),
+        ("foreman", "Прораб"),
+        ("iko", "ИКО"),
+    )
+
+    uuid_audit = models.UUIDField("UUID аудита", default=uuid.uuid4, editable=False)
+    object = models.ForeignKey(ConstructionObject, verbose_name="Объект", on_delete=models.CASCADE, related_name="role_audit")
+
+    field = models.CharField("Поле", max_length=16, choices=FIELD)
+    old_user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Старый пользователь", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    new_user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Новый пользователь", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    changed_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Кем изменено", null=True, blank=True, on_delete=models.SET_NULL, related_name="object_role_changes")
+    comment = models.CharField("Комментарий", max_length=500, blank=True)
+
+    class Meta:
+        verbose_name = "Аудит ролей объекта"
+        verbose_name_plural = "Аудит ролей объектов"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.object_id}:{self.field} {self.old_user_id}→{self.new_user_id}"

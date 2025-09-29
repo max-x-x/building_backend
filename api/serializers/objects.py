@@ -75,3 +75,71 @@ class ObjectShortSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConstructionObject
         fields = ("id", "uuid_obj", "name", "address")
+
+class ObjectPatchSerializer(serializers.Serializer):
+    foreman_id = serializers.UUIDField(required=False, allow_null=True)
+    ssk_id = serializers.UUIDField(required=False, allow_null=True)
+    primary_iko_id = serializers.UUIDField(required=False, allow_null=True)
+    coordinates_id = serializers.IntegerField(required=False, allow_null=True)
+    can_continue_construction = serializers.BooleanField(required=False)
+
+    def validate(self, data):
+        obj: ConstructionObject = self.context["object"]
+        user: User = self.context["request"].user
+
+        # admin — везде; ССК — только в своих объектах
+        if user.role not in (Roles.ADMIN, Roles.SSK):
+            raise serializers.ValidationError("Недостаточно прав")
+        if user.role == Roles.SSK and obj.ssk_id != user.id:
+            raise serializers.ValidationError("Недостаточно прав: чужой объект")
+
+        # проверить роли, если переданы
+        def _get_user(uid, role):
+            if uid is None:
+                return None
+            try:
+                u = User.objects.get(id=uid, is_active=True)
+            except User.DoesNotExist:
+                raise serializers.ValidationError({f"{role}_id": "Пользователь не найден"})
+            if u.role != role:
+                raise serializers.ValidationError({f"{role}_id": f"Пользователь не {role}"})
+            return u
+
+        if "foreman_id" in data:
+            data["foreman"] = _get_user(data["foreman_id"], Roles.FOREMAN) if data["foreman_id"] else None
+        if "ssk_id" in data:
+            data["ssk"] = _get_user(data["ssk_id"], Roles.SSK) if data["ssk_id"] else None
+        if "primary_iko_id" in data:
+            data["iko"] = _get_user(data["primary_iko_id"], Roles.IKO) if data["primary_iko_id"] else None
+
+        return data
+
+    def save(self, **kwargs):
+        from api.models.object import ObjectRoleAudit
+        obj: ConstructionObject = self.context["object"]
+        req = self.context["request"]
+
+        old = {"ssk": obj.ssk, "foreman": obj.foreman, "iko": obj.iko}
+
+        if "foreman" in self.validated_data:
+            obj.foreman = self.validated_data["foreman"]
+        if "ssk" in self.validated_data:
+            obj.ssk = self.validated_data["ssk"]
+        if "iko" in self.validated_data:
+            obj.iko = self.validated_data["iko"]
+        if "coordinates_id" in self.validated_data:
+            obj.coordinates_id = self.validated_data["coordinates_id"]
+        if "can_continue_construction" in self.validated_data:
+            obj.can_proceed = bool(self.validated_data["can_continue_construction"])
+
+        obj.save()
+
+        # аудит смен ролей
+        for field in ("ssk", "foreman", "iko"):
+            if old[field] != getattr(obj, field):
+                ObjectRoleAudit.objects.create(
+                    object=obj, field=field,
+                    old_user=old[field], new_user=getattr(obj, field),
+                    changed_by=req.user
+                )
+        return obj

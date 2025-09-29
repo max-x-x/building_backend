@@ -1,4 +1,7 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -7,7 +10,8 @@ from api.api.v1.views.auth_methods import create_access_token, create_refresh_to
 from api.api.v1.views.utils import RoleRequired
 from api.models.user import RefreshToken, Roles, Invitation
 from api.serializers.auth import (LoginSerializer, LoginOutSerializer, RefreshInSerializer, RefreshOutSerializer,
-                                  InviteInSerializer, InviteOutSerializer, LogoutInSerializer)
+                                  InviteInSerializer, InviteOutSerializer, LogoutInSerializer,
+                                  RegisterByInviteInSerializer, RegisterByInviteOutSerializer)
 
 User = get_user_model()
 
@@ -109,3 +113,39 @@ class AuthLogoutView(APIView):
         except RefreshToken.DoesNotExist:
             pass
         return Response(status=204)
+
+
+class AuthRegisterByInviteView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        ser = RegisterByInviteInSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        inv = ser.context["invitation"]
+
+        user, _ = User.objects.get_or_create(email=inv.email.lower(), defaults={
+            "role": inv.role,
+            "is_active": True,
+        })
+        # Обновляем ФИО/телефон и пароль
+        user.full_name = ser.validated_data["full_name"]
+        user.phone = ser.validated_data.get("phone", "")
+        user.set_password(ser.validated_data["password1"])
+        user.save()
+
+        inv.accepted_at = timezone.now()
+        inv.save(update_fields=["accepted_at"])
+
+        # Письмо после успешной регистрации
+        try:
+            send_mail(
+                subject="Регистрация завершена",
+                message=f"Добро пожаловать! Вы можете войти на сайт: {getattr(settings,'FRONTEND_URL','https://example.com')}/login",
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com"),
+                recipient_list=[user.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+        return Response(RegisterByInviteOutSerializer(user).data, status=status.HTTP_201_CREATED)

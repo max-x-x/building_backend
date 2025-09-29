@@ -1,7 +1,14 @@
+from django.db import transaction, models
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
+from api.api.v1.views.objects import _visible_object_ids_for_user, _paginated
+from api.api.v1.views.utils import RoleRequired
+from api.models.user import Roles
+from api.models.work_plan import WorkPlanVersion, WorkPlanChangeRequest, WorkPlan
+from api.serializers.work_plan_versions import (WorkPlanDetailOutSerializer, WPVersionCreateSerializer,
+                                                WPChangeRequestCreateSerializer, WPChangeDecisionSerializer)
 from api.serializers.work_plans import WorkPlanCreateSerializer, WorkPlanOutSerializer
 
 class WorkPlanCreateView(APIView):
@@ -24,3 +31,85 @@ class WorkPlanCreateView(APIView):
         ser.is_valid(raise_exception=True)
         plan = ser.save()
         return Response(WorkPlanOutSerializer(plan).data, status=status.HTTP_201_CREATED)
+
+class WorkPlanDetailView(APIView):
+    def get(self, request, id: int):
+        try:
+            wp = WorkPlan.objects.select_related("object","created_by").get(id=id)
+        except WorkPlan.DoesNotExist:
+            return Response({"detail":"Not found"}, status=404)
+        if wp.object_id not in _visible_object_ids_for_user(request.user):
+            return Response({"detail":"Forbidden"}, status=403)
+        return Response(WorkPlanDetailOutSerializer(wp).data, status=200)
+
+class WorkPlansListView(APIView):
+    def get(self, request):
+        object_id = request.query_params.get("object_id")
+        qs = WorkPlan.objects.all().order_by("-created_at")
+        if object_id:
+            qs = qs.filter(object_id=object_id)
+        page, total = _paginated(qs, request)
+        data = WorkPlanDetailOutSerializer(page, many=True).data
+        return Response({"items": data, "total": total}, status=200)
+
+class WorkPlanAddVersionView(APIView):
+    permission_classes = [RoleRequired.as_permitted(Roles.SSK, Roles.ADMIN)]
+
+    @transaction.atomic
+    def post(self, request, id: int):
+        try:
+            wp = WorkPlan.objects.select_for_update().get(id=id)
+        except WorkPlan.DoesNotExist:
+            return Response({"detail":"Not found"}, status=404)
+        if request.user.role != Roles.ADMIN and wp.object.ssk_id != request.user.id:
+            return Response({"detail":"Forbidden"}, status=403)
+        ser = WPVersionCreateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        next_version = (WorkPlanVersion.objects.filter(plan=wp).aggregate(m=models.Max("version")).get("m") or 0) + 1
+        v = WorkPlanVersion.objects.create(plan=wp, version=next_version, doc_url=ser.validated_data["doc_url"])
+        return Response({"version": v.version, "doc_url": v.doc_url}, status=201)
+
+class WorkPlanRequestChangeView(APIView):
+    permission_classes = [RoleRequired.as_permitted(Roles.FOREMAN, Roles.ADMIN)]
+
+    def post(self, request, id: int):
+        try:
+            wp = WorkPlan.objects.get(id=id)
+        except WorkPlan.DoesNotExist:
+            return Response({"detail":"Not found"}, status=404)
+        if request.user.role != Roles.ADMIN and wp.object.foreman_id != request.user.id:
+            return Response({"detail":"Forbidden"}, status=403)
+        ser = WPChangeRequestCreateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        cr = WorkPlanChangeRequest.objects.create(
+            plan=wp, proposed_doc_url=ser.validated_data["proposed_doc_url"],
+            comment=ser.validated_data.get("comment",""), requested_by=request.user
+        )
+        return Response({"status":"pending_review","id":cr.id}, status=202)
+
+class WorkPlanApproveChangeView(APIView):
+    permission_classes = [RoleRequired.as_permitted(Roles.SSK, Roles.ADMIN)]
+
+    @transaction.atomic
+    def post(self, request, id: int):
+        try:
+            wp = WorkPlan.objects.select_for_update().get(id=id)
+        except WorkPlan.DoesNotExist:
+            return Response({"detail":"Not found"}, status=404)
+        if request.user.role != Roles.ADMIN and wp.object.ssk_id != request.user.id:
+            return Response({"detail":"Forbidden"}, status=403)
+        ser = WPChangeDecisionSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        decision = ser.validated_data["decision"]
+        cr = WorkPlanChangeRequest.objects.filter(plan=wp, status="pending").order_by("created_at").last()
+        if not cr:
+            return Response({"detail":"Нет активной заявки"}, status=400)
+        cr.decided_by = request.user
+        if decision == "approve":
+            next_version = (WorkPlanVersion.objects.filter(plan=wp).aggregate(m=models.Max("version")).get("m") or 0) + 1
+            WorkPlanVersion.objects.create(plan=wp, version=next_version, doc_url=cr.proposed_doc_url)
+            cr.status = "approved"
+        else:
+            cr.status = "rejected"
+        cr.save(update_fields=["status","decided_by","updated_at"])
+        return Response({"status": cr.status}, status=200)
