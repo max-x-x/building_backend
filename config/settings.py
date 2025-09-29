@@ -30,6 +30,8 @@ include(
     'components/jwt.py',
 )
 
+CORS_ALLOW_ALL_ORIGINS = True
+
 ROOT_URLCONF = 'config.urls'
 
 WSGI_APPLICATION = 'config.wsgi.application'
