@@ -4,10 +4,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from api.api.v1.views.objects import _visible_object_ids_for_user, _paginated
-from api.api.v1.views.utils import RoleRequired
+from api.api.v1.views.utils import RoleRequired, send_notification
 from api.models.user import Roles
 from api.models.prescription import Prescription, PrescriptionFix
-from api.models.notify import Notification
+# from api.models.notify import Notification  # disabled: notifications handled externally
 from api.serializers.prescription import (PrescriptionCreateSerializer, PrescriptionOutSerializer,
                                           PrescriptionFixCreateSerializer, PrescriptionListSerializer)
 
@@ -58,7 +58,7 @@ class PrescriptionsCollectionView(APIView):
             pres.object.can_proceed = False
             pres.object.save(update_fields=["can_proceed"])
 
-        # нотификации — оставь как у тебя было
+        # notifications disabled
         return Response(PrescriptionOutSerializer(pres).data, status=201)
 
 
@@ -86,8 +86,7 @@ class PrescriptionFixView(APIView):
 
         pres.status = "awaiting_verification"
         pres.save(update_fields=["status"])
-
-        Notification.objects.create(object=pres.object, to_user=pres.author, type="prescription_fixed", payload={"prescription_id": pres.id})
+        # notifications disabled
         return Response(PrescriptionOutSerializer(pres).data, status=200)
 
 
@@ -125,13 +124,35 @@ class PrescriptionVerifyView(APIView):
                     pres.object.can_proceed = True
                     pres.object.save(update_fields=["can_proceed"])
         else:
-            pres.status = "open"
-            pres.save(update_fields=["status"])
+            # автоклон при отклонении: текущее закрываем и создаём новое открытое
+            pres.status = "closed"
+            pres.closed_at = timezone.now()
+            pres.save(update_fields=["status", "closed_at"])
 
-        if pres.object.ssk_id:
-            Notification.objects.create(object=pres.object, to_user=pres.object.ssk, type="prescription_fixed", payload={"accepted": bool(accepted), "comment": comment})
-        if pres.object.foreman_id:
-            Notification.objects.create(object=pres.object, to_user=pres.object.foreman, type="prescription_fixed", payload={"accepted": bool(accepted), "comment": comment})
+            new_pres = Prescription.objects.create(
+                object=pres.object,
+                author=request.user,
+                title=pres.title,
+                description=f"Повторное нарушение. Причина отклонения: {comment}\n\nПредыдущее описание:\n{pres.description}",
+                requires_stop=pres.requires_stop,
+                requires_personal_recheck=pres.requires_personal_recheck,
+                attachments=pres.attachments,
+                status="open",
+            )
+
+        # внешние уведомления
+        try:
+            subj = "Статус нарушения обновлён"
+            if accepted:
+                msg = f"Нарушение #{pres.id} закрыто."
+            else:
+                msg = f"Нарушение #{pres.id} отклонено. Создано новое #{new_pres.id}. Причина: {comment}"
+            if pres.object.foreman_id and pres.object.foreman:
+                send_notification(pres.object.foreman_id, pres.object.foreman.email, subj, msg)
+            if pres.object.ssk_id and pres.object.ssk:
+                send_notification(pres.object.ssk_id, pres.object.ssk.email, subj, msg)
+        except Exception:
+            pass
 
         return Response(PrescriptionOutSerializer(pres).data, status=200)
 

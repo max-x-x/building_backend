@@ -46,3 +46,4 @@ USE_TZ = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+NOTIFY_SERVICE_URL = os.getenv("NOTIFY_SERVICE_URL", "")

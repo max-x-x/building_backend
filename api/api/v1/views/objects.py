@@ -47,9 +47,8 @@ class ObjectsListCreateView(APIView):
         qs = ConstructionObject.objects.select_related("ssk", "foreman", "iko").all()
 
         # видимость по роли
-        if request.user.role == Roles.SSK:
-            qs = qs.filter(ssk=request.user)
-        elif request.user.role == Roles.IKO:
+        # SSK теперь видит все объекты; фильтрация по своим — через mine=true
+        if request.user.role == Roles.IKO:
             qs = qs.filter(iko=request.user)
         elif request.user.role == Roles.FOREMAN:
             qs = qs.filter(foreman=request.user)
@@ -62,6 +61,12 @@ class ObjectsListCreateView(APIView):
         if mine in {"1", "true", "True"}:
             if request.user.role == Roles.ADMIN:
                 qs = qs.filter(created_by=request.user)  # для админа "мои" = я создал
+            elif request.user.role == Roles.SSK:
+                qs = qs.filter(ssk=request.user)
+            elif request.user.role == Roles.IKO:
+                qs = qs.filter(iko=request.user)
+            elif request.user.role == Roles.FOREMAN:
+                qs = qs.filter(foreman=request.user)
 
         page, total = _paginated(qs.order_by("-created_at"), request)
         return Response(ObjectsListOutSerializer({"items": page, "total": total}).data, status=200)
@@ -105,7 +110,12 @@ class ObjectsDetailView(APIView):
 
         ser = ObjectPatchSerializer(data=request.data, partial=True, context={"request": request, "object": obj})
         ser.is_valid(raise_exception=True)
+        before_ssk = obj.ssk_id
         obj = ser.save()
+        # если привязали ССК впервые — статус в ожидание активации
+        if not before_ssk and obj.ssk_id and obj.status == ObjectStatus.DRAFT:
+            obj.status = ObjectStatus.ACTIVATION_PENDING
+            obj.save(update_fields=["status"]) 
         return Response(ObjectOutSerializer(obj).data, status=200)
 
 

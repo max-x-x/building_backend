@@ -4,6 +4,7 @@ from django.conf import settings
 from api.models.timestamp import TimeStampedMixin
 from api.models.object import ConstructionObject
 
+# TODO убрать
 class Ticket(TimeStampedMixin):
     STATUS = (("open", "Открыт"), ("in_progress", "В работе"), ("done", "Закрыт"))
 

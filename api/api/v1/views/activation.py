@@ -4,10 +4,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from api.api.v1.views.utils import RoleRequired
+from api.api.v1.views.utils import RoleRequired, send_notification
 from api.models.user import Roles
-from api.models.object import ConstructionObject, ObjectActivation
-from api.models.notify import Notification
+from api.models.object import ConstructionObject, ObjectActivation, ObjectStatus
+# from api.models.notify import Notification  # disabled: notifications handled externally
 from api.serializers.activation import ActivationRequestInSerializer, ActivationOutSerializer, pick_iko
 
 
@@ -47,9 +47,12 @@ class ActivationRequestView(APIView):
             ssk_checklist_pdf=ser.validated_data.get("ssk_checklist_pdf", ""),
         )
 
-        # уведомления
-        Notification.objects.create(object=obj, to_user=obj.iko, type="activation_requested", payload={"activation_id": act.id})
-        Notification.objects.create(object=obj, to_role=Roles.IKO, type="visit_action_needed", payload={"hint": "Создайте заявку на посещение"})
+        # уведомления внешнему сервису: ИКО — выберите дату посещения
+        try:
+            if obj.iko_id and obj.iko:
+                send_notification(obj.iko_id, obj.iko.email, "Запрос активации объекта", f"Объект '{obj.name}': выберите дату посещения для активации")
+        except Exception:
+            pass
 
         return Response(ActivationOutSerializer(act).data, status=201)
 
@@ -90,21 +93,24 @@ class ActivationIkoCheckView(APIView):
             act.status = "checked"
             act.rejected_reason = rejected_reason
             act.save()
-            # уведомление ССК/прорабу что есть нарушения
-            if obj.ssk_id:
-                Notification.objects.create(object=obj, to_user=obj.ssk, type="violations_found", payload={})
-            if obj.foreman_id:
-                Notification.objects.create(object=obj, to_user=obj.foreman, type="violations_found", payload={})
+            # уведомления отключены, обрабатываются внешним сервисом
             return Response(ActivationOutSerializer(act).data, status=200)
         else:
             act.status = "approved"
             act.approved_at = timezone.now()
             act.rejected_reason = ""
             act.save()
+            obj.status = ObjectStatus.ACTIVE
             obj.can_proceed = True
-            obj.save(update_fields=["can_proceed"])
-            if obj.ssk_id:
-                Notification.objects.create(object=obj, to_user=obj.ssk, type="activation_approved", payload={})
-            if obj.foreman_id:
-                Notification.objects.create(object=obj, to_user=obj.foreman, type="activation_approved", payload={})
+            obj.save(update_fields=["status","can_proceed"])
+            # уведомления внешнему сервису
+            try:
+                subj = "Активация объекта одобрена"
+                msg = f"Объект '{obj.name}' активирован."
+                if obj.ssk_id and obj.ssk:
+                    send_notification(obj.ssk_id, obj.ssk.email, subj, msg)
+                if obj.foreman_id and obj.foreman:
+                    send_notification(obj.foreman_id, obj.foreman.email, subj, msg)
+            except Exception:
+                pass
             return Response(ActivationOutSerializer(act).data, status=200)

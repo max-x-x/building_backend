@@ -112,7 +112,7 @@ class RefreshToken(TimeStampedMixin):
 def _invite_expires_default():
     return timezone.now() + timedelta(days=14)
 
-
+# TODO убрать
 class Invitation(TimeStampedMixin):
     """
     Инвайт по email под конкретную роль (для онбординга).

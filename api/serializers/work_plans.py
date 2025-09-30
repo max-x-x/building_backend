@@ -75,3 +75,6 @@ class WorkPlanOutSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkPlan
         fields = ("id", "uuid_wp", "object", "title", "created_by", "created_at")
+
+class WorkItemSetStatusSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=["planned","in_progress","done"])

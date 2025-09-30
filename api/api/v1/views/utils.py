@@ -1,4 +1,6 @@
 from rest_framework.permissions import BasePermission
+import requests
+from django.conf import settings
 
 class RoleRequired(BasePermission):
     """
@@ -18,3 +20,23 @@ class RoleRequired(BasePermission):
         if not self.allowed_roles:
             return True
         return request.user.role in self.allowed_roles
+
+
+def send_notification(user_id: int | None, email: str | None, subject: str, message: str) -> None:
+    """
+    Отправка уведомления во внешний сервис. Ошибки не падают наружу.
+    """
+    url = getattr(settings, "NOTIFY_SERVICE_URL", "")
+    if not url:
+        return
+    try:
+        payload = {
+            "user_id": user_id,
+            "email": email,
+            "subject": subject,
+            "message": message,
+        }
+        requests.post(url, json=payload, timeout=5)
+    except Exception:
+        # гасим сбои внешнего сервиса, чтобы не ломать основной флоу
+        pass

@@ -6,10 +6,10 @@ from rest_framework import status
 from api.api.v1.views.objects import _visible_object_ids_for_user, _paginated
 from api.api.v1.views.utils import RoleRequired
 from api.models.user import Roles
-from api.models.work_plan import WorkPlanVersion, WorkPlanChangeRequest, WorkPlan
+from api.models.work_plan import WorkPlanVersion, WorkPlanChangeRequest, WorkPlan, ScheduleItem
 from api.serializers.work_plan_versions import (WorkPlanDetailOutSerializer, WPVersionCreateSerializer,
                                                 WPChangeRequestCreateSerializer, WPChangeDecisionSerializer)
-from api.serializers.work_plans import WorkPlanCreateSerializer, WorkPlanOutSerializer
+from api.serializers.work_plans import WorkPlanCreateSerializer, WorkPlanOutSerializer, WorkItemSetStatusSerializer
 
 class WorkPlanCreateView(APIView):
     """
@@ -113,3 +113,20 @@ class WorkPlanApproveChangeView(APIView):
             cr.status = "rejected"
         cr.save(update_fields=["status","decided_by","updated_at"])
         return Response({"status": cr.status}, status=200)
+
+
+class WorkItemSetStatusView(APIView):
+    permission_classes = [RoleRequired.as_permitted(Roles.SSK, Roles.ADMIN)]
+
+    def post(self, request, id: int):
+        try:
+            si = ScheduleItem.objects.select_related("object", "work_item", "object__ssk").get(id=id)
+        except ScheduleItem.DoesNotExist:
+            return Response({"detail":"Not found"}, status=404)
+        if request.user.role != Roles.ADMIN and si.object.ssk_id != request.user.id:
+            return Response({"detail":"Forbidden"}, status=403)
+        ser = WorkItemSetStatusSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        si.status = ser.validated_data["status"]
+        si.save(update_fields=["status","modified_at"])
+        return Response({"status": si.status}, status=200)

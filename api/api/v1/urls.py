@@ -1,11 +1,11 @@
 from django.urls import path
 
 from api.api.v1.views.activation import ActivationRequestView, ActivationIkoCheckView
-from api.api.v1.views.auth import (AuthLoginView, AuthRefreshView, AuthInviteView, AuthLogoutView,
+from api.api.v1.views.auth import (AuthLoginView, AuthRefreshView, AuthLogoutView,
                                    AuthRegisterByInviteView)
 from api.api.v1.views.daily_checklists import DailyChecklistsView, DailyChecklistReviewView
 from api.api.v1.views.deliveries import (DeliveriesCreateView, DeliveryReceiveView, DeliveriesListView,
-                                         InvoicesCreateView, InvoiceParseTTNView, DeliverySetStatusView,
+                                         InvoicesCreateView, DeliverySetStatusView,
                                          LabOrdersCreateView)
 from api.api.v1.views.documents import DocumentsListView, ExecDocsView
 from api.api.v1.views.foremen import ForemenListView
@@ -16,18 +16,19 @@ from api.api.v1.views.objects import (ObjectsListCreateView, ObjectsDetailView,
 from api.api.v1.views.prescriptions import (PrescriptionFixView, PrescriptionVerifyView,
                                             ViolationsListView, PrescriptionsDetailView,
                                             PrescriptionsCollectionView)
-from api.api.v1.views.tickets import TicketsView, TicketSetStatusView
+ # from api.api.v1.views.tickets import TicketsView, TicketSetStatusView  # disabled: admin panel tickets external
 from api.api.v1.views.users import UsersMeView, UsersDetailView, UsersListCreateView
-from api.api.v1.views.visits import (QrCreateView, VisitsDetailView, VisitRequestsView)
+# from api.api.v1.views.visits import (QrCreateView, VisitsDetailView, VisitRequestsView)  # disabled: visits/qr external
 from api.api.v1.views.work_plans import (WorkPlanCreateView, WorkPlanDetailView, WorkPlansListView,
-                                         WorkPlanAddVersionView, WorkPlanRequestChangeView, WorkPlanApproveChangeView)
+                                         WorkPlanAddVersionView, WorkPlanRequestChangeView, WorkPlanApproveChangeView,
+                                         WorkItemSetStatusView)
 from api.api.v1.views.works import WorksListView, WorkCreateView
 
 urlpatterns = [
     # AUTH
     path("auth/login",   AuthLoginView.as_view(),   name="auth-login"),
     path("auth/refresh", AuthRefreshView.as_view(), name="auth-refresh"),
-    path("auth/invite",  AuthInviteView.as_view(),  name="auth-invite"),
+    # path("auth/invite",  AuthInviteView.as_view(),  name="auth-invite"),  # disabled: invites handled externally
     path("auth/logout",  AuthLogoutView.as_view(),  name="auth-logout"),
     path("auth/register-by-invite", AuthRegisterByInviteView.as_view(), name="auth-register-by-invite"),
 
@@ -48,10 +49,10 @@ urlpatterns = [
     path("objects/<int:id>/resume",   ObjectResumeView.as_view(),   name="object-resume"),
     path("objects/<int:id>/complete", ObjectCompleteView.as_view(), name="object-complete"),
 
-    # VISITS + QR
-    path("visit-requests",            VisitRequestsView.as_view(),   name="visit-requests-collection"),  # GET+POST
-    path("visit-requests/<int:id>",   VisitsDetailView.as_view(),    name="visit-requests-detail"),
-    path("qr-codes",                  QrCreateView.as_view(),        name="qr-create"),
+    # VISITS + QR (disabled, handled by external service)
+    # path("visit-requests",            VisitRequestsView.as_view(),   name="visit-requests-collection"),  # GET+POST
+    # path("visit-requests/<int:id>",   VisitsDetailView.as_view(),    name="visit-requests-detail"),
+    # path("qr-codes",                  QrCreateView.as_view(),        name="qr-create"),
 
     # PRESCRIPTIONS
     path("prescriptions",                   PrescriptionsCollectionView.as_view(), name="prescriptions-collection"),  # GET+POST
@@ -74,6 +75,7 @@ urlpatterns = [
     path("work-plans/<int:id>/versions", WorkPlanAddVersionView.as_view(), name="work-plan-add-version"),
     path("work-plans/<int:id>/request-change", WorkPlanRequestChangeView.as_view(), name="work-plan-request-change"),
     path("work-plans/<int:id>/approve-change", WorkPlanApproveChangeView.as_view(), name="work-plan-approve-change"),
+    path("work-items/<int:id>/status", WorkItemSetStatusView.as_view(), name="work-item-set-status"),
 
     # DAILY CHECKLISTS
     path("daily-checklists", DailyChecklistsView.as_view(), name="daily-checklists"),
@@ -84,7 +86,7 @@ urlpatterns = [
     path("deliveries/<int:id>", DeliveryReceiveView.as_view(), name="delivery-receive"),
     path("deliveries/list", DeliveriesListView.as_view(), name="deliveries-list"),
     path("invoices", InvoicesCreateView.as_view(), name="invoices-create"),
-    path("invoices/<int:id>/parse-ttn", InvoiceParseTTNView.as_view(), name="invoice-parse-ttn"),
+    # path("invoices/<int:id>/parse-ttn", InvoiceParseTTNView.as_view(), name="invoice-parse-ttn"),  # disabled: CV external
     path("deliveries/<int:id>/status", DeliverySetStatusView.as_view(), name="deliveries-set-status"),
     path("labs/orders", LabOrdersCreateView.as_view(), name="labs-orders-create"),
 
@@ -95,9 +97,9 @@ urlpatterns = [
     # MEMOS
     path("memos", MemosView.as_view(), name="memos"),
 
-    # TICKETS
-    path("tickets", TicketsView.as_view(), name="tickets"),
-    path("tickets/<uuid:id>/status", TicketSetStatusView.as_view(), name="ticket-set-status"),
+    # TICKETS (disabled: admin panel external)
+    # path("tickets", TicketsView.as_view(), name="tickets"),
+    # path("tickets/<uuid:id>/status", TicketSetStatusView.as_view(), name="ticket-set-status"),
 
     path("ping", PingView.as_view(), name="ping"),
 ]

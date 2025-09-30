@@ -2,6 +2,7 @@ import uuid
 from django.db import models
 from api.models.timestamp import TimeStampedMixin
 
+# TODO убрать
 class Memo(TimeStampedMixin):
     uuid_memo = models.UUIDField("UUID памятки", default=uuid.uuid4, editable=False)
     title = models.CharField("Название", max_length=300)

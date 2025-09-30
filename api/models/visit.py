@@ -5,7 +5,7 @@ from django.conf import settings
 from api.models.timestamp import TimeStampedMixin
 from api.models.object import ConstructionObject
 
-
+# TODO убрать
 class VisitRequest(TimeStampedMixin):
     """
     Заявка на посещение объекта (обычно ИКО после запроса активации).
@@ -31,7 +31,7 @@ class VisitRequest(TimeStampedMixin):
     def __str__(self):
         return f"Visit[{self.pk}] {self.object.name} — {self.get_status_display()}"
 
-
+# TODO убрать
 class QrCode(TimeStampedMixin):
     """
     QR-код на посещение (назначает админ; закреплён под объект и пользователя).

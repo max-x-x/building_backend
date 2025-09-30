@@ -3,6 +3,7 @@ from django.db.models import Count
 
 from api.models.user import User, Roles
 from api.models.object import ConstructionObject
+from api.models.documents import ExecDocument, DocumentFile
 
 class UserBriefSerializer(serializers.ModelSerializer):
     class Meta:
@@ -10,15 +11,25 @@ class UserBriefSerializer(serializers.ModelSerializer):
         fields = ("id", "email", "full_name", "role")
 
 class ObjectCreateSerializer(serializers.ModelSerializer):
+    # ссылки на файлы/папку из файлового хранилища
+    folder_url = serializers.URLField(required=False, allow_blank=True)
+    document_files = serializers.ListField(child=serializers.URLField(), required=False)
     class Meta:
         model = ConstructionObject
-        fields = ("id", "uuid_obj", "name", "address")
+        fields = ("id", "uuid_obj", "name", "address", "folder_url", "document_files")
 
     def create(self, validated_data):
         request = self.context.get("request")
         creator = request.user if request and request.user.is_authenticated else None
 
+        folder_url = validated_data.pop("folder_url", "")
+        document_files = validated_data.pop("document_files", [])
         obj = ConstructionObject.objects.create(created_by=creator, **validated_data)
+        # сохранить ссылки на документы
+        if folder_url:
+            ExecDocument.objects.create(object=obj, kind="general", pdf_url=folder_url, created_by=creator)
+        for url in document_files:
+            DocumentFile.objects.create(object=obj, name=url.rsplit("/", 1)[-1], url=url)
         return obj
 
 class ObjectOutSerializer(serializers.ModelSerializer):
@@ -28,7 +39,7 @@ class ObjectOutSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConstructionObject
-        fields = ("id", "uuid_obj", "name", "address", "ssk", "foreman", "iko", "can_proceed", "created_at")
+        fields = ("id", "uuid_obj", "name", "address", "status", "ssk", "foreman", "iko", "can_proceed", "created_at")
 
 class ObjectsListOutSerializer(serializers.Serializer):
     items = ObjectOutSerializer(many=True)
@@ -72,6 +83,8 @@ class ObjectPatchSerializer(serializers.Serializer):
     ssk_id = serializers.UUIDField(required=False, allow_null=True)
     primary_iko_id = serializers.UUIDField(required=False, allow_null=True)
     coordinates_id = serializers.IntegerField(required=False, allow_null=True)
+    folder_url = serializers.URLField(required=False, allow_blank=True)
+    document_files = serializers.ListField(child=serializers.URLField(), required=False)
     can_continue_construction = serializers.BooleanField(required=False)
 
     def validate(self, data):
@@ -124,6 +137,13 @@ class ObjectPatchSerializer(serializers.Serializer):
             obj.can_proceed = bool(self.validated_data["can_continue_construction"])
 
         obj.save()
+
+        # документы
+        folder_url = self.validated_data.get("folder_url")
+        if folder_url:
+            ExecDocument.objects.create(object=obj, kind="general", pdf_url=folder_url, created_by=req.user)
+        for url in self.validated_data.get("document_files", []) or []:
+            DocumentFile.objects.create(object=obj, name=url.rsplit("/", 1)[-1], url=url)
 
         # аудит смен ролей
         for field in ("ssk", "foreman", "iko"):
