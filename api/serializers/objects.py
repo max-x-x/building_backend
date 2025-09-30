@@ -18,16 +18,7 @@ class ObjectCreateSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         creator = request.user if request and request.user.is_authenticated else None
 
-        ssk_qs = User.objects.filter(role=Roles.SSK, is_active=True).annotate(
-            obj_count=Count("ssk_objects")
-        ).order_by("obj_count", "date_joined")
-        ssk = ssk_qs.first()
-        if not ssk:
-            raise serializers.ValidationError({"ssk": "Нет доступных ССК для назначения"})
-
-        obj = ConstructionObject.objects.create(
-            ssk=ssk, created_by=creator, **validated_data
-        )
+        obj = ConstructionObject.objects.create(created_by=creator, **validated_data)
         return obj
 
 class ObjectOutSerializer(serializers.ModelSerializer):

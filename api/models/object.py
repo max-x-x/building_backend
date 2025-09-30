@@ -21,8 +21,7 @@ class ConstructionObject(TimeStampedMixin):
         "Статус", max_length=32, choices=ObjectStatus.choices, default=ObjectStatus.DRAFT
     )
     ssk = models.ForeignKey(
-        settings.AUTH_USER_MODEL, verbose_name="ССК",
-        on_delete=models.PROTECT, related_name="ssk_objects"
+        settings.AUTH_USER_MODEL, verbose_name="ССК", blank=True, null=True, on_delete=models.SET_NULL, related_name="ssk_objects"
     )
     foreman = models.ForeignKey(
         settings.AUTH_USER_MODEL, verbose_name="Прораб",
