@@ -45,21 +45,13 @@ class RegisterByInviteInSerializer(serializers.Serializer):
     email = serializers.EmailField()
     full_name = serializers.CharField(max_length=200)
     phone = serializers.CharField(required=False, allow_blank=True)
+    role = serializers.CharField(required=False, allow_blank=True)
     password1 = serializers.CharField(min_length=8)
     password2 = serializers.CharField(min_length=8)
 
     def validate(self, data):
         if data["password1"] != data["password2"]:
             raise serializers.ValidationError({"password2": "Пароли не совпадают"})
-        try:
-            inv = Invitation.objects.get(email__iexact=data["email"])
-        except Invitation.DoesNotExist:
-            raise serializers.ValidationError({"token": "Неверный email"})
-        if inv.is_expired():
-            raise serializers.ValidationError({"token": "Срок действия приглашения истёк"})
-        if inv.accepted_at:
-            raise serializers.ValidationError({"token": "Приглашение уже принято"})
-        self.context["invitation"] = inv
         return data
 
 class RegisterByInviteOutSerializer(serializers.ModelSerializer):

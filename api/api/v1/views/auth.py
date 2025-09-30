@@ -121,31 +121,16 @@ class AuthRegisterByInviteView(APIView):
     def post(self, request):
         ser = RegisterByInviteInSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        inv = ser.context["invitation"]
-
-        user, _ = User.objects.get_or_create(email=inv.email.lower(), defaults={
-            "role": inv.role,
-            "is_active": True,
-        })
+        try:
+            user = User.objects.get(email=ser.validated_data["email"].lower())
+            return Response({"detail": "User already exists"}, status=400)
+        except User.DoesNotExist:
+            user = User.objects.create(email=ser.validated_data["email"].lower())
         # Обновляем ФИО/телефон и пароль
         user.full_name = ser.validated_data["full_name"]
+        user.role = ser.validated_data["role"]
         user.phone = ser.validated_data.get("phone", "")
         user.set_password(ser.validated_data["password1"])
         user.save()
-
-        inv.accepted_at = timezone.now()
-        inv.save(update_fields=["accepted_at"])
-
-        # Письмо после успешной регистрации
-        try:
-            send_mail(
-                subject="Регистрация завершена",
-                message=f"Добро пожаловать! Вы можете войти на сайт: {getattr(settings,'FRONTEND_URL','https://example.com')}/login",
-                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com"),
-                recipient_list=[user.email],
-                fail_silently=True,
-            )
-        except Exception:
-            pass
 
         return Response(RegisterByInviteOutSerializer(user).data, status=status.HTTP_201_CREATED)
