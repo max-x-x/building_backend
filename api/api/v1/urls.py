@@ -1,7 +1,8 @@
 from django.urls import path
 
 from api.api.v1.views.activation import ActivationRequestView, ActivationIkoCheckView
-from api.api.v1.views.auth import AuthLoginView, AuthRefreshView, AuthInviteView, AuthLogoutView
+from api.api.v1.views.auth import (AuthLoginView, AuthRefreshView, AuthInviteView, AuthLogoutView,
+                                   AuthRegisterByInviteView)
 from api.api.v1.views.daily_checklists import DailyChecklistsView, DailyChecklistReviewView
 from api.api.v1.views.deliveries import (DeliveriesCreateView, DeliveryReceiveView, DeliveriesListView,
                                          InvoicesCreateView, InvoiceParseTTNView, DeliverySetStatusView,
@@ -27,6 +28,7 @@ urlpatterns = [
     path("auth/refresh", AuthRefreshView.as_view(), name="auth-refresh"),
     path("auth/invite",  AuthInviteView.as_view(),  name="auth-invite"),
     path("auth/logout",  AuthLogoutView.as_view(),  name="auth-logout"),
+    path("auth/register-by-invite", AuthRegisterByInviteView.as_view(), name="auth-register-by-invite"),
 
     # USERS
     path("users/me",           UsersMeView.as_view(),           name="users-me"),

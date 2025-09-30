@@ -19,7 +19,10 @@ class VisitRequestsView(APIView):
     """
     def get(self, request):
         object_ids = _visible_object_ids_for_user(request.user)
-        qs = VisitRequest.objects.filter(object_id__in=object_ids).order_by("-created_at")
+        qs = (VisitRequest.objects
+              .filter(object_id__in=object_ids)
+              .select_related("object", "requested_by")
+              .order_by("-created_at"))
 
         object_id = request.query_params.get("object_id")
         if object_id:
@@ -67,6 +70,11 @@ class VisitRequestsView(APIView):
             requested_by=request.user,
             planned_at=ser.validated_data.get("planned_at"),
             status="pending",
+        )
+        vr = (
+            VisitRequest.objects
+            .select_related("object", "requested_by")
+            .get(id=vr.id)
         )
         # нотификации оставь как у тебя
         return Response(VisitRequestListSerializer(vr).data, status=201)

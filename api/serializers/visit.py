@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from api.models.visit import VisitRequest, QrCode
 from api.serializers.objects import ObjectShortSerializer
+from api.serializers.users import UserOutSerializer
 
 
 class VisitRequestCreateSerializer(serializers.ModelSerializer):
@@ -9,12 +10,16 @@ class VisitRequestCreateSerializer(serializers.ModelSerializer):
         fields = ("object", "planned_at")
 
 class VisitRequestOutSerializer(serializers.ModelSerializer):
+    object = ObjectShortSerializer(read_only=True)
+    requested_by = UserOutSerializer(read_only=True)
+
     class Meta:
         model = VisitRequest
         fields = "__all__"
 
 class VisitRequestListSerializer(serializers.ModelSerializer):
     object = ObjectShortSerializer(read_only=True)
+    requested_by = UserOutSerializer(read_only=True)
 
     class Meta:
         model = VisitRequest

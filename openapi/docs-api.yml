@@ -181,7 +181,8 @@ components:
         id: { type: integer }
         uuid_visit: { type: string, format: uuid }
         object: { $ref: '#/components/schemas/ConstructionObject' }
-        requested_by: { type: string, format: uuid }
+        requested_by:
+          $ref: '#/components/schemas/User'   # <— было: { type: string, format: uuid }
         planned_at: { type: string, format: date-time }
         status: { type: string, enum: [pending, qr_assigned, done, cancelled] }
         created_at: { type: string, format: date-time }
