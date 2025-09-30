@@ -42,7 +42,6 @@ class LogoutInSerializer(serializers.Serializer):
 
 
 class RegisterByInviteInSerializer(serializers.Serializer):
-    token = serializers.UUIDField()
     email = serializers.EmailField()
     full_name = serializers.CharField(max_length=200)
     phone = serializers.CharField(required=False, allow_blank=True)
@@ -53,9 +52,9 @@ class RegisterByInviteInSerializer(serializers.Serializer):
         if data["password1"] != data["password2"]:
             raise serializers.ValidationError({"password2": "Пароли не совпадают"})
         try:
-            inv = Invitation.objects.get(token=data["token"], email__iexact=data["email"])
+            inv = Invitation.objects.get(email__iexact=data["email"])
         except Invitation.DoesNotExist:
-            raise serializers.ValidationError({"token": "Неверный токен или email"})
+            raise serializers.ValidationError({"token": "Неверный email"})
         if inv.is_expired():
             raise serializers.ValidationError({"token": "Срок действия приглашения истёк"})
         if inv.accepted_at:

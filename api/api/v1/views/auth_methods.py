@@ -1,7 +1,6 @@
 import jwt
 import uuid
 from datetime import datetime, timedelta, timezone as pytimezone
-from typing import Optional, Tuple
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
