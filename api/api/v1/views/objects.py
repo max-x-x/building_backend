@@ -93,7 +93,7 @@ class ObjectsDetailView(APIView):
 
         allowed = (
             request.user.role == Roles.ADMIN or
-            obj.ssk_id == request.user.id or
+            request.user.role == Roles.SSK or
             obj.iko_id == request.user.id or
             obj.foreman_id == request.user.id
         )
