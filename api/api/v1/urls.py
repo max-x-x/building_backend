@@ -9,6 +9,7 @@ from api.api.v1.views.deliveries import (DeliveriesCreateView, DeliveryReceiveVi
                                          LabOrdersCreateView)
 from api.api.v1.views.documents import DocumentsListView, ExecDocsView
 from api.api.v1.views.foremen import ForemenListView
+from api.api.v1.views.health import PingView
 from api.api.v1.views.memos import MemosView
 from api.api.v1.views.objects import (ObjectsListCreateView, ObjectsDetailView,
                                       ObjectSuspendView, ObjectResumeView, ObjectCompleteView)
@@ -97,5 +98,7 @@ urlpatterns = [
     # TICKETS
     path("tickets", TicketsView.as_view(), name="tickets"),
     path("tickets/<uuid:id>/status", TicketSetStatusView.as_view(), name="ticket-set-status"),
+
+    path("ping", PingView.as_view(), name="ping"),
 ]
 
