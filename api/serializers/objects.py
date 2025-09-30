@@ -4,6 +4,7 @@ from django.db.models import Count
 from api.models.user import User, Roles
 from api.models.object import ConstructionObject
 from api.models.documents import ExecDocument, DocumentFile
+from api.models.area import Area
 
 class UserBriefSerializer(serializers.ModelSerializer):
     class Meta:
@@ -32,14 +33,27 @@ class ObjectCreateSerializer(serializers.ModelSerializer):
             DocumentFile.objects.create(object=obj, name=url.rsplit("/", 1)[-1], url=url)
         return obj
 
+class AreaBriefSerializer(serializers.ModelSerializer):
+    """Краткий сериализатор для полигона объекта."""
+    geometry_type = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Area
+        fields = ("id", "uuid_area", "name", "geometry", "geometry_type")
+    
+    def get_geometry_type(self, obj):
+        return obj.get_geometry_type()
+
+
 class ObjectOutSerializer(serializers.ModelSerializer):
     ssk = UserBriefSerializer()
     foreman = UserBriefSerializer(allow_null=True)
     iko = UserBriefSerializer(allow_null=True)
+    areas = AreaBriefSerializer(many=True, read_only=True)
 
     class Meta:
         model = ConstructionObject
-        fields = ("id", "uuid_obj", "name", "address", "status", "ssk", "foreman", "iko", "can_proceed", "created_at")
+        fields = ("id", "uuid_obj", "name", "address", "status", "ssk", "foreman", "iko", "can_proceed", "areas", "created_at")
 
 class ObjectsListOutSerializer(serializers.Serializer):
     items = ObjectOutSerializer(many=True)

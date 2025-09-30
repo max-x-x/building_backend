@@ -44,7 +44,7 @@ class ObjectsListCreateView(APIView):
         status_param = request.query_params.get("status")
         mine = request.query_params.get("mine")
 
-        qs = ConstructionObject.objects.select_related("ssk", "foreman", "iko").all()
+        qs = ConstructionObject.objects.select_related("ssk", "foreman", "iko").prefetch_related("areas").all()
 
         # видимость по роли
         # SSK теперь видит все объекты; фильтрация по своим — через mine=true
@@ -87,7 +87,7 @@ class ObjectsDetailView(APIView):
     """
     def get(self, request, id: int):
         try:
-            obj = ConstructionObject.objects.select_related("ssk", "foreman", "iko").get(id=id)
+            obj = ConstructionObject.objects.select_related("ssk", "foreman", "iko").prefetch_related("areas").get(id=id)
         except ConstructionObject.DoesNotExist:
             return Response({"detail": "Not found"}, status=404)
 

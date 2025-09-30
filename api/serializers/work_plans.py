@@ -18,7 +18,7 @@ class WorkItemCreateSerializer(serializers.Serializer):
         return data
 
 class WorkPlanCreateSerializer(serializers.Serializer):
-    object_id = serializers.UUIDField()
+    object_id = serializers.IntegerField()
     title = serializers.CharField(max_length=255, required=False, allow_blank=True)
     items = WorkItemCreateSerializer(many=True)
 
@@ -26,7 +26,7 @@ class WorkPlanCreateSerializer(serializers.Serializer):
         request = self.context["request"]
 
         try:
-            obj = ConstructionObject.objects.get(uuid_obj=data["object_id"])
+            obj = ConstructionObject.objects.get(id=data["object_id"])
         except ConstructionObject.DoesNotExist:
             raise serializers.ValidationError({"object_id": "Объект не найден"})
 

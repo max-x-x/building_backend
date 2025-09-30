@@ -22,6 +22,7 @@ from api.api.v1.views.users import UsersMeView, UsersDetailView, UsersListCreate
 from api.api.v1.views.work_plans import (WorkPlanCreateView, WorkPlanDetailView, WorkPlansListView,
                                          WorkPlanAddVersionView, WorkPlanRequestChangeView, WorkPlanApproveChangeView,
                                          WorkItemSetStatusView)
+from api.api.v1.views.areas import AreasCreateView, AreasDetailView, AreasListView
 from api.api.v1.views.works import WorksListView, WorkCreateView
 
 urlpatterns = [
@@ -100,6 +101,11 @@ urlpatterns = [
     # TICKETS (disabled: admin panel external)
     # path("tickets", TicketsView.as_view(), name="tickets"),
     # path("tickets/<uuid:id>/status", TicketSetStatusView.as_view(), name="ticket-set-status"),
+
+    # AREAS / POLYGONS
+    path("areas", AreasCreateView.as_view(), name="areas-create"),
+    path("areas/<int:id>", AreasDetailView.as_view(), name="areas-detail"),
+    path("areas/list", AreasListView.as_view(), name="areas-list"),
 
     path("ping", PingView.as_view(), name="ping"),
 ]

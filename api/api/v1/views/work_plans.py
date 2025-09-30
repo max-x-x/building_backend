@@ -1,4 +1,5 @@
 from django.db import transaction, models
+from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -35,7 +36,7 @@ class WorkPlanCreateView(APIView):
 class WorkPlanDetailView(APIView):
     def get(self, request, id: int):
         try:
-            wp = WorkPlan.objects.select_related("object","created_by").get(id=id)
+            wp = WorkPlan.objects.select_related("object","created_by").prefetch_related("items__schedule_item").get(id=id)
         except WorkPlan.DoesNotExist:
             return Response({"detail":"Not found"}, status=404)
         if wp.object_id not in _visible_object_ids_for_user(request.user):
@@ -44,10 +45,24 @@ class WorkPlanDetailView(APIView):
 
 class WorkPlansListView(APIView):
     def get(self, request):
+        # Получаем объекты, доступные пользователю
+        visible_object_ids = _visible_object_ids_for_user(request.user)
+        qs = WorkPlan.objects.filter(object_id__in=visible_object_ids).select_related("object", "created_by").prefetch_related("items__schedule_item").order_by("-created_at")
+        
+        # Фильтрация по объекту
         object_id = request.query_params.get("object_id")
-        qs = WorkPlan.objects.all().order_by("-created_at")
         if object_id:
             qs = qs.filter(object_id=object_id)
+        
+        # Поиск по названию объекта или названию графика работ
+        query = request.query_params.get("query")
+        if query:
+            qs = qs.filter(
+                Q(object__name__icontains=query) | 
+                Q(object__address__icontains=query) | 
+                Q(title__icontains=query)
+            )
+        
         page, total = _paginated(qs, request)
         data = WorkPlanDetailOutSerializer(page, many=True).data
         return Response({"items": data, "total": total}, status=200)
@@ -124,7 +139,8 @@ class WorkItemSetStatusView(APIView):
         except ScheduleItem.DoesNotExist:
             return Response({"detail":"Not found"}, status=404)
         if request.user.role != Roles.ADMIN and si.object.ssk_id != request.user.id:
-            return Response({"detail":"Forbidden"}, status=403)
+            return Response({"detail":"Forbidden: только ССК объекта может изменять статус работ"}, status=403)
+        
         ser = WorkItemSetStatusSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         si.status = ser.validated_data["status"]
