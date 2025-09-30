@@ -91,11 +91,9 @@ class ObjectPatchSerializer(serializers.Serializer):
         obj: ConstructionObject = self.context["object"]
         user: User = self.context["request"].user
 
-        # admin — везде; ССК — только в своих объектах
+        # admin — везде; ССК — может работать с любым объектом (назначать себя и других)
         if user.role not in (Roles.ADMIN, Roles.SSK):
             raise serializers.ValidationError("Недостаточно прав")
-        if user.role == Roles.SSK and obj.ssk_id != user.id:
-            raise serializers.ValidationError("Недостаточно прав: чужой объект")
 
         # проверить роли, если переданы
         def _get_user(uid, role):
