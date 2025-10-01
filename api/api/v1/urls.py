@@ -24,6 +24,7 @@ from api.api.v1.views.work_plans import (WorkPlanCreateView, WorkPlanDetailView,
                                          WorkItemSetStatusView)
 from api.api.v1.views.areas import AreasCreateView, AreasDetailView, AreasListView
 from api.api.v1.views.works import WorksListView, WorkCreateView
+from api.api.v1.views.admin import AdminStatsView
 
 urlpatterns = [
     # AUTH
@@ -106,6 +107,9 @@ urlpatterns = [
     path("areas", AreasCreateView.as_view(), name="areas-create"),
     path("areas/<int:id>", AreasDetailView.as_view(), name="areas-detail"),
     path("areas/list", AreasListView.as_view(), name="areas-list"),
+
+    # ADMIN STATS
+    path("admin/stats", AdminStatsView.as_view(), name="admin-stats"),
 
     path("ping", PingView.as_view(), name="ping"),
 ]
