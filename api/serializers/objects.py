@@ -5,6 +5,7 @@ from api.models.user import User, Roles
 from api.models.object import ConstructionObject
 from api.models.documents import ExecDocument, DocumentFile
 from api.models.area import Area
+from api.models.work_plan import WorkPlan, WorkItem, ScheduleItem
 
 class UserBriefSerializer(serializers.ModelSerializer):
     class Meta:
@@ -50,10 +51,35 @@ class ObjectOutSerializer(serializers.ModelSerializer):
     foreman = UserBriefSerializer(allow_null=True)
     iko = UserBriefSerializer(allow_null=True)
     areas = AreaBriefSerializer(many=True, read_only=True)
+    work_progress = serializers.SerializerMethodField()
 
     class Meta:
         model = ConstructionObject
-        fields = ("id", "uuid_obj", "name", "address", "status", "ssk", "foreman", "iko", "can_proceed", "areas", "created_at")
+        fields = ("id", "uuid_obj", "name", "address", "status", "ssk", "foreman", "iko", "can_proceed", "areas", "work_progress", "created_at")
+
+    def get_work_progress(self, obj):
+        """Рассчитывает процент выполнения работ по графику."""
+        try:
+            # Получаем последний график работ для объекта
+            work_plan = WorkPlan.objects.filter(object=obj).order_by('-created_at').first()
+            if not work_plan:
+                return 0
+            
+            # Считаем общее количество работ
+            total_works = WorkItem.objects.filter(plan=work_plan).count()
+            if total_works == 0:
+                return 0
+            
+            # Считаем выполненные работы (статус "done")
+            completed_works = WorkItem.objects.filter(
+                plan=work_plan,
+                schedule_item__status="done"
+            ).count()
+            
+            # Возвращаем процент
+            return int((completed_works / total_works) * 100)
+        except Exception:
+            return 0
 
 class ObjectsListOutSerializer(serializers.Serializer):
     items = ObjectOutSerializer(many=True)
