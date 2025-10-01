@@ -5,7 +5,7 @@ from rest_framework import status, permissions
 
 from api.models import Roles
 from api.serializers.objects import (ObjectCreateSerializer, ObjectOutSerializer, ObjectAssignForemanSerializer,
-                                     ObjectsListOutSerializer, ObjectPatchSerializer)
+                                     ObjectsListOutSerializer, ObjectPatchSerializer, ObjectFullDetailSerializer)
 from api.models.object import ConstructionObject, ObjectStatus
 
 
@@ -172,3 +172,37 @@ class ObjectCompleteView(APIView):
         obj.can_proceed = False
         obj.save(update_fields=["status", "can_proceed", "modified_at"])
         return Response({"status": obj.status}, status=200)
+
+
+class ObjectFullDetailView(APIView):
+    """
+    GET /api/v1/objects/{id}/full
+    Получение максимально подробной информации об объекте со всеми связанными данными.
+    """
+    def get(self, request, id: int):
+        try:
+            obj = ConstructionObject.objects.select_related(
+                "ssk", "foreman", "iko", "created_by"
+            ).prefetch_related(
+                "areas",
+                "deliveries__invoices__materials",
+                "work_plans__items__schedule_item",
+                "prescriptions",
+                "works",
+                "daily_checklists",
+                "activations"
+            ).get(id=id)
+        except ConstructionObject.DoesNotExist:
+            return Response({"detail": "Not found"}, status=404)
+
+        # Проверяем права доступа
+        allowed = (
+            request.user.role == Roles.ADMIN or
+            request.user.role == Roles.SSK or
+            obj.iko_id == request.user.id or
+            obj.foreman_id == request.user.id
+        )
+        if not allowed:
+            return Response({"detail": "Forbidden"}, status=403)
+
+        return Response(ObjectFullDetailSerializer(obj).data, status=200)

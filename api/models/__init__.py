@@ -5,9 +5,11 @@ from api.models.notify import Notification
 from api.models.prescription import Prescription, PrescriptionFix
 from api.models.visit import QrCode, VisitRequest
 from api.models.area import Area
+from api.models.delivery import Delivery, Invoice, Material, LabOrder
 
 __all__ = ["Roles", "User", "RefreshToken", "Invitation",
            "ConstructionObject", "WorkPlan", "WorkItem", "ScheduleItem",
            "ObjectActivation", "Notification", "Prescription",
-           "PrescriptionFix", "QrCode", "VisitRequest", "Area"]
+           "PrescriptionFix", "QrCode", "VisitRequest", "Area",
+           "Delivery", "Invoice", "Material", "LabOrder"]
 

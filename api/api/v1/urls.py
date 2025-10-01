@@ -6,13 +6,15 @@ from api.api.v1.views.auth import (AuthLoginView, AuthRefreshView, AuthLogoutVie
 from api.api.v1.views.daily_checklists import DailyChecklistsView, DailyChecklistReviewView
 from api.api.v1.views.deliveries import (DeliveriesCreateView, DeliveryReceiveView, DeliveriesListView,
                                          InvoicesCreateView, DeliverySetStatusView,
-                                         LabOrdersCreateView)
+                                         LabOrdersCreateView, InvoiceDataReceiveView, DeliveryConfirmView,
+                                         DeliveryDetailView)
 from api.api.v1.views.documents import DocumentsListView, ExecDocsView
 from api.api.v1.views.foremen import ForemenListView
 from api.api.v1.views.health import PingView
 from api.api.v1.views.memos import MemosView
 from api.api.v1.views.objects import (ObjectsListCreateView, ObjectsDetailView,
-                                      ObjectSuspendView, ObjectResumeView, ObjectCompleteView)
+                                      ObjectSuspendView, ObjectResumeView, ObjectCompleteView,
+                                      ObjectFullDetailView)
 from api.api.v1.views.prescriptions import (PrescriptionFixView, PrescriptionVerifyView,
                                             ViolationsListView, PrescriptionsDetailView,
                                             PrescriptionsCollectionView)
@@ -43,6 +45,7 @@ urlpatterns = [
     # OBJECTS
     path("objects",              ObjectsListCreateView.as_view(), name="objects-list-create"),
     path("objects/<int:id>",     ObjectsDetailView.as_view(),     name="objects-detail"),
+    path("objects/<int:id>/full", ObjectFullDetailView.as_view(), name="objects-full-detail"),
 
     path("objects/<int:id>/activation/request",   ActivationRequestView.as_view(), name="object-activation-request"),
     path("objects/<int:id>/activation/iko-check", ActivationIkoCheckView.as_view(), name="object-activation-iko-check"),
@@ -85,9 +88,12 @@ urlpatterns = [
 
     # DELIVERIES / INVOICES / LABS
     path("deliveries", DeliveriesCreateView.as_view(), name="deliveries-create"),
-    path("deliveries/<int:id>", DeliveryReceiveView.as_view(), name="delivery-receive"),
+    path("deliveries/<int:id>", DeliveryDetailView.as_view(), name="delivery-detail"),
+    path("deliveries/<int:id>/receive", DeliveryReceiveView.as_view(), name="delivery-receive"),
     path("deliveries/list", DeliveriesListView.as_view(), name="deliveries-list"),
+    path("deliveries/<int:id>/confirm", DeliveryConfirmView.as_view(), name="delivery-confirm"),
     path("invoices", InvoicesCreateView.as_view(), name="invoices-create"),
+    path("invoices/data", InvoiceDataReceiveView.as_view(), name="invoices-data-receive"),
     # path("invoices/<int:id>/parse-ttn", InvoiceParseTTNView.as_view(), name="invoice-parse-ttn"),  # disabled: CV external
     path("deliveries/<int:id>/status", DeliverySetStatusView.as_view(), name="deliveries-set-status"),
     path("labs/orders", LabOrdersCreateView.as_view(), name="labs-orders-create"),

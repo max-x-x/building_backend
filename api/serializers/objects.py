@@ -2,10 +2,14 @@ from rest_framework import serializers
 from django.db.models import Count
 
 from api.models.user import User, Roles
-from api.models.object import ConstructionObject
+from api.models.object import ConstructionObject, ObjectActivation
 from api.models.documents import ExecDocument, DocumentFile
 from api.models.area import Area
 from api.models.work_plan import WorkPlan, WorkItem, ScheduleItem
+from api.models.delivery import Delivery, Invoice, Material
+from api.models.prescription import Prescription, PrescriptionFix
+from api.models.work import Work
+from api.models.checklist import DailyChecklist
 
 class UserBriefSerializer(serializers.ModelSerializer):
     class Meta:
@@ -192,3 +196,169 @@ class ObjectPatchSerializer(serializers.Serializer):
                     changed_by=req.user
                 )
         return obj
+
+
+# Комплексные сериализаторы для детальной информации об объекте
+
+class MaterialDetailSerializer(serializers.ModelSerializer):
+    """Детальный сериализатор для материала."""
+    class Meta:
+        model = Material
+        fields = ("id", "uuid_material", "material_name", "material_quantity", 
+                "material_size", "material_volume", "material_netto", 
+                "is_confirmed", "created_at", "modified_at")
+
+class InvoiceDetailSerializer(serializers.ModelSerializer):
+    """Детальный сериализатор для накладной."""
+    materials = MaterialDetailSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = Invoice
+        fields = ("id", "uuid_invoice", "pdf_url", "folder_url", "data", 
+                "materials", "created_at", "modified_at")
+
+class DeliveryDetailSerializer(serializers.ModelSerializer):
+    """Детальный сериализатор для поставки."""
+    invoices = InvoiceDetailSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = Delivery
+        fields = ("id", "uuid_delivery", "planned_date", "notes", "status", 
+                "created_by", "invoices", "created_at", "modified_at")
+
+class WorkItemDetailSerializer(serializers.ModelSerializer):
+    """Детальный сериализатор для работы в графике."""
+    status = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = WorkItem
+        fields = ("id", "uuid_wi", "name", "quantity", "unit", "start_date", 
+                "end_date", "document_url", "status", "created_at", "modified_at")
+    
+    def get_status(self, obj):
+        try:
+            schedule_item = obj.schedule_item
+            return schedule_item.status
+        except:
+            return "planned"
+
+class WorkPlanDetailSerializer(serializers.ModelSerializer):
+    """Детальный сериализатор для графика работ."""
+    work_items = WorkItemDetailSerializer(source="items", many=True, read_only=True)
+    
+    class Meta:
+        model = WorkPlan
+        fields = ("id", "uuid_wp", "title", "created_by", "work_items", 
+                "created_at", "modified_at")
+
+class PrescriptionDetailSerializer(serializers.ModelSerializer):
+    """Детальный сериализатор для нарушения."""
+    class Meta:
+        model = Prescription
+        fields = ("id", "title", "description", "status", "requires_stop", 
+                "requires_personal_recheck", "attachments", "author", 
+                "created_at", "closed_at", "modified_at")
+
+class WorkDetailSerializer(serializers.ModelSerializer):
+    """Детальный сериализатор для работы/задачи."""
+    class Meta:
+        model = Work
+        fields = ("id", "uuid_work", "title", "status", "responsible", 
+                "reviewer", "created_at", "modified_at")
+
+class DailyChecklistDetailSerializer(serializers.ModelSerializer):
+    """Детальный сериализатор для ежедневного чек-листа."""
+    class Meta:
+        model = DailyChecklist
+        fields = ("id", "uuid_checklist", "status", "reviewed_by", 
+                "reviewed_at", "created_at", "modified_at")
+
+class ObjectActivationDetailSerializer(serializers.ModelSerializer):
+    """Детальный сериализатор для активации объекта."""
+    class Meta:
+        model = ObjectActivation
+        fields = ("id", "uuid_activation", "status", "requested_by", 
+                "ssk_checklist", "ssk_checklist_pdf", "requested_at",
+                "iko_checklist", "iko_checklist_pdf", "iko_has_violations",
+                "iko_checked_at", "approved_at", "rejected_reason",
+                "created_at", "modified_at")
+
+class ObjectFullDetailSerializer(serializers.ModelSerializer):
+    """Комплексный сериализатор для полной информации об объекте."""
+    ssk = UserBriefSerializer(read_only=True)
+    foreman = UserBriefSerializer(read_only=True)
+    iko = UserBriefSerializer(read_only=True)
+    created_by = UserBriefSerializer(read_only=True)
+    areas = AreaBriefSerializer(many=True, read_only=True)
+    work_progress = serializers.SerializerMethodField()
+    
+    # Связанные данные
+    deliveries = DeliveryDetailSerializer(many=True, read_only=True)
+    work_plans = WorkPlanDetailSerializer(many=True, read_only=True)
+    prescriptions = PrescriptionDetailSerializer(many=True, read_only=True)
+    works = WorkDetailSerializer(many=True, read_only=True)
+    daily_checklists = DailyChecklistDetailSerializer(many=True, read_only=True)
+    activations = ObjectActivationDetailSerializer(many=True, read_only=True)
+    
+    # Статистика
+    deliveries_count = serializers.SerializerMethodField()
+    work_plans_count = serializers.SerializerMethodField()
+    prescriptions_count = serializers.SerializerMethodField()
+    open_prescriptions_count = serializers.SerializerMethodField()
+    works_count = serializers.SerializerMethodField()
+    daily_checklists_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ConstructionObject
+        fields = (
+            # Основная информация
+            "id", "uuid_obj", "name", "address", "status", "can_proceed",
+            "ssk", "foreman", "iko", "created_by", "areas", "work_progress",
+            "created_at", "modified_at",
+            
+            # Связанные данные
+            "deliveries", "work_plans", "prescriptions", "works", 
+            "daily_checklists", "activations",
+            
+            # Статистика
+            "deliveries_count", "work_plans_count", "prescriptions_count",
+            "open_prescriptions_count", "works_count", "daily_checklists_count"
+        )
+    
+    def get_work_progress(self, obj):
+        """Рассчитывает процент выполнения работ по графику."""
+        try:
+            work_plan = WorkPlan.objects.filter(object=obj).order_by('-created_at').first()
+            if not work_plan:
+                return 0
+            
+            total_works = WorkItem.objects.filter(plan=work_plan).count()
+            if total_works == 0:
+                return 0
+            
+            completed_works = WorkItem.objects.filter(
+                plan=work_plan,
+                schedule_item__status="done"
+            ).count()
+            
+            return int((completed_works / total_works) * 100)
+        except Exception:
+            return 0
+    
+    def get_deliveries_count(self, obj):
+        return obj.deliveries.count()
+    
+    def get_work_plans_count(self, obj):
+        return obj.work_plans.count()
+    
+    def get_prescriptions_count(self, obj):
+        return obj.prescriptions.count()
+    
+    def get_open_prescriptions_count(self, obj):
+        return obj.prescriptions.filter(status="open").count()
+    
+    def get_works_count(self, obj):
+        return obj.works.count()
+    
+    def get_daily_checklists_count(self, obj):
+        return obj.daily_checklists.count()

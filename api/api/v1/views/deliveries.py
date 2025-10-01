@@ -1,12 +1,12 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from api.models.user import Roles
-from api.models.delivery import Delivery, Invoice, LabOrder
+from api.models.delivery import Delivery, Invoice, LabOrder, Material
 from api.models.object import ConstructionObject
 from api.api.v1.views.objects import _visible_object_ids_for_user, _paginated
 from api.serializers.deliveries import (DeliveryCreateSerializer, DeliveryOutSerializer, DeliveryReceiveSerializer,
                                         InvoiceCreateSerializer, ParseTTNSerializer, DeliveryStatusSerializer,
-                                        LabOrderCreateSerializer)
+                                        LabOrderCreateSerializer, InvoiceDataSerializer, DeliveryConfirmSerializer)
 
 
 class DeliveriesCreateView(APIView):
@@ -131,3 +131,159 @@ class LabOrdersCreateView(APIView):
         d.status = "sent_to_lab"
         d.save(update_fields=["status"])
         return Response({"order_id": lo.id, "uuid_lab_order": str(lo.uuid_lab_order), "status": lo.status}, status=201)
+
+
+class InvoiceDataReceiveView(APIView):
+    """
+    POST /api/v1/invoices/data
+    Принимает данные от внешнего сервиса CV с распознанными материалами.
+    """
+    def post(self, request):
+        ser = InvoiceDataSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        
+        try:
+            delivery = Delivery.objects.get(id=ser.validated_data["delivery_id"])
+        except Delivery.DoesNotExist:
+            return Response({"detail": "Delivery not found"}, status=404)
+        
+        folder_url = ser.validated_data["folder_url"]
+        materials_data = ser.validated_data["materials_data"]
+        
+        # Создаем накладную с ссылкой на папку
+        invoice = Invoice.objects.create(
+            object=delivery.object,
+            delivery=delivery,
+            pdf_url="",  # Будет заполнено позже
+            folder_url=folder_url,
+            data={"materials_count": len(materials_data)}
+        )
+        
+        # Создаем материалы для каждого элемента в списке
+        created_materials = []
+        for material_data in materials_data:
+            material = Material.objects.create(
+                delivery=delivery,
+                invoice=invoice,
+                material_name=material_data.get("Наименование материала", ""),
+                material_quantity=material_data.get("Количество материала", ""),
+                material_size=material_data.get("Размер", ""),
+                material_volume=material_data.get("Объем", ""),
+                material_netto=material_data.get("Нетто", "")
+            )
+            created_materials.append(material)
+        
+        return Response({
+            "invoice_id": invoice.id,
+            "materials_count": len(created_materials),
+            "status": "success"
+        }, status=201)
+
+
+class DeliveryConfirmView(APIView):
+    """
+    POST /api/v1/deliveries/{id}/confirm
+    Подтверждение поставки с обновлением материалов.
+    """
+    def post(self, request, id: int):
+        try:
+            delivery = Delivery.objects.get(id=id)
+        except Delivery.DoesNotExist:
+            return Response({"detail": "Delivery not found"}, status=404)
+        
+        ser = DeliveryConfirmSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        
+        # Проверяем права доступа
+        requested_status = ser.validated_data["status"]
+        
+        if request.user.role == Roles.FOREMAN:
+            if delivery.object.foreman_id != request.user.id:
+                return Response({"detail": "Forbidden"}, status=403)
+            # Прораб может только изменить статус на "received"
+            if requested_status != "received":
+                return Response({"detail": "Foreman can only set status to 'received'"}, status=400)
+            expected_status = "received"
+        elif request.user.role == Roles.SSK:
+            if delivery.object.ssk_id != request.user.id:
+                return Response({"detail": "Forbidden"}, status=403)
+            # ССК может принять или отправить в лабораторию
+            if requested_status not in ["accepted", "sent_to_lab"]:
+                return Response({"detail": "SSK can only accept or send to lab"}, status=400)
+            expected_status = requested_status
+        elif request.user.role == Roles.ADMIN:
+            expected_status = requested_status
+        else:
+            return Response({"detail": "Forbidden"}, status=403)
+        
+        # Обновляем материалы
+        materials_data = ser.validated_data["materials"]
+        for material_data in materials_data:
+            material_id = material_data.get("id")
+            if material_id:
+                try:
+                    material = Material.objects.get(id=material_id, delivery=delivery)
+                    for field, value in material_data.items():
+                        if field != "id" and hasattr(material, field):
+                            setattr(material, field, value)
+                    material.save()
+                except Material.DoesNotExist:
+                    continue
+        
+        # Обновляем статус поставки
+        delivery.status = expected_status
+        delivery.save(update_fields=["status"])
+        
+        # Отправляем уведомления
+        from api.api.v1.views.utils import send_notification
+        try:
+            if expected_status == "received":
+                # Уведомляем ССК о том, что прораб принял поставку
+                if delivery.object.ssk_id and delivery.object.ssk:
+                    send_notification(
+                        delivery.object.ssk_id,
+                        delivery.object.ssk.email,
+                        "Поставка принята прорабом",
+                        f"Поставка #{delivery.id} для объекта '{delivery.object.name}' принята прорабом. Требуется ваше подтверждение."
+                    )
+            elif expected_status == "accepted":
+                # Уведомляем прораба о том, что ССК подтвердил поставку
+                if delivery.object.foreman_id and delivery.object.foreman:
+                    send_notification(
+                        delivery.object.foreman_id,
+                        delivery.object.foreman.email,
+                        "Поставка подтверждена ССК",
+                        f"Поставка #{delivery.id} для объекта '{delivery.object.name}' подтверждена ССК."
+                    )
+            elif expected_status == "sent_to_lab":
+                # Уведомляем прораба о том, что поставка отправлена в лабораторию
+                if delivery.object.foreman_id and delivery.object.foreman:
+                    send_notification(
+                        delivery.object.foreman_id,
+                        delivery.object.foreman.email,
+                        "Поставка отправлена в лабораторию",
+                        f"Поставка #{delivery.id} для объекта '{delivery.object.name}' отправлена в лабораторию."
+                    )
+        except Exception:
+            pass
+        
+        return Response(DeliveryOutSerializer(delivery).data, status=200)
+
+
+class DeliveryDetailView(APIView):
+    """
+    GET /api/v1/deliveries/{id}
+    Получение детальной информации о поставке с материалами.
+    """
+    def get(self, request, id: int):
+        try:
+            delivery = Delivery.objects.select_related("object", "created_by").prefetch_related("invoices__materials").get(id=id)
+        except Delivery.DoesNotExist:
+            return Response({"detail": "Delivery not found"}, status=404)
+        
+        # Проверяем права доступа
+        visible_object_ids = _visible_object_ids_for_user(request.user)
+        if delivery.object_id not in visible_object_ids:
+            return Response({"detail": "Forbidden"}, status=403)
+        
+        return Response(DeliveryOutSerializer(delivery).data, status=200)
