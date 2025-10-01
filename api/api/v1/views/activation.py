@@ -32,7 +32,7 @@ class ActivationRequestView(APIView):
         ser.is_valid(raise_exception=True)
 
         # автопривязка ИКО при необходимости
-        if not obj.iko_id:
+        if not obj.iko:
             iko = pick_iko()
             if not iko:
                 return Response({"detail": "No available IKO"}, status=400)
@@ -49,8 +49,8 @@ class ActivationRequestView(APIView):
 
         # уведомления внешнему сервису: ИКО — выберите дату посещения
         try:
-            if obj.iko_id and obj.iko:
-                send_notification(obj.iko_id, obj.iko.email, "Запрос активации объекта", f"Объект '{obj.name}': выберите дату посещения для активации")
+            if obj.iko__id and obj.iko:
+                send_notification(obj.iko__id, obj.iko.email, "Запрос активации объекта", f"Объект '{obj.name}': выберите дату посещения для активации")
         except Exception:
             pass
 

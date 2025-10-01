@@ -22,11 +22,12 @@ class RoleRequired(BasePermission):
         return request.user.role in self.allowed_roles
 
 
-def send_notification(user_id: int | None, email: str | None, subject: str, message: str) -> None:
+def send_notification(user_id: str | None, email: str | None, subject: str, message: str) -> None:
     """
     Отправка уведомления во внешний сервис. Ошибки не падают наружу.
     """
     url = getattr(settings, "NOTIFY_SERVICE_URL", "")
+    print(url)
     if not url:
         return
     try:
@@ -36,7 +37,8 @@ def send_notification(user_id: int | None, email: str | None, subject: str, mess
             "subject": subject,
             "message": message,
         }
+        print(payload)
         requests.post(url, json=payload, timeout=5)
     except Exception:
-        # гасим сбои внешнего сервиса, чтобы не ломать основной флоу
+        print(f"Failed to send notification to {email}: {subject}: {message}")
         pass
