@@ -26,6 +26,6 @@ class PrescriptionListSerializer(serializers.ModelSerializer):
         fields = (
             "id", "uuid_prescription",
             "object", "author", "title",
-            "requires_stop", "requires_personal_recheck",
+            "requires_stop", "requires_personal_recheck", "description",
             "status", "created_at", "closed_at",
         )
