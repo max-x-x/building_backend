@@ -5,3 +5,8 @@ from api.admin.notify import *
 from api.admin.prescription import *
 from api.admin.visit import *
 from api.admin.logs import *
+from api.admin.delivery import *
+from api.admin.area import *
+from api.admin.checklist import *
+from api.admin.work import *
+from api.admin.memo import *

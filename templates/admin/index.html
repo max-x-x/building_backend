@@ -1,0 +1,232 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <style>
+        .dashboard {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 20px 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .dashboard h1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 25px;
+            border-radius: 8px;
+            margin: 0 0 25px 0;
+            font-size: 24px;
+            font-weight: 600;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .app-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .app-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            border-left: 4px solid;
+        }
+        
+        .app-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        }
+        
+        .app-card.users {
+            border-left-color: #dc3545;
+        }
+        
+        .app-card.objects {
+            border-left-color: #28a745;
+        }
+        
+        .app-card.prescriptions {
+            border-left-color: #dc3545;
+        }
+        
+        .app-card.deliveries {
+            border-left-color: #ffc107;
+        }
+        
+        .app-card.work-plans {
+            border-left-color: #17a2b8;
+        }
+        
+        .app-card.logs {
+            border-left-color: #6c757d;
+        }
+        
+        .app-card h2 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .model-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .model-list li {
+            margin: 8px 0;
+        }
+        
+        .model-list a {
+            display: block;
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            text-decoration: none;
+            color: #495057;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+        
+        .model-list a:hover {
+            background: #e9ecef;
+            border-left-color: #007bff;
+            transform: translateX(5px);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 25px 0;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            color: #6c757d;
+            font-weight: 500;
+        }
+        
+        .stat-card.users .stat-number { color: #dc3545; }
+        .stat-card.objects .stat-number { color: #28a745; }
+        .stat-card.prescriptions .stat-number { color: #dc3545; }
+        .stat-card.deliveries .stat-number { color: #ffc107; }
+        .stat-card.logs .stat-number { color: #6c757d; }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <h1>🏗️ Панель управления строительной платформой</h1>
+    
+    <div class="stats-grid">
+        <div class="stat-card users">
+            <div class="stat-number">{{ user_count|default:"—" }}</div>
+            <div class="stat-label">👥 Пользователей</div>
+        </div>
+        <div class="stat-card objects">
+            <div class="stat-number">{{ object_count|default:"—" }}</div>
+            <div class="stat-label">🏗️ Объектов</div>
+        </div>
+        <div class="stat-card prescriptions">
+            <div class="stat-number">{{ prescription_count|default:"—" }}</div>
+            <div class="stat-label">⚠️ Нарушений</div>
+        </div>
+        <div class="stat-card deliveries">
+            <div class="stat-number">{{ delivery_count|default:"—" }}</div>
+            <div class="stat-label">🚚 Поставок</div>
+        </div>
+        <div class="stat-card logs">
+            <div class="stat-number">{{ log_count|default:"—" }}</div>
+            <div class="stat-label">📝 Логов</div>
+        </div>
+    </div>
+    
+    <div class="app-list">
+        <div class="app-card users">
+            <h2>👥 Пользователи</h2>
+            <ul class="model-list">
+                <li><a href="{% url 'admin:api_user_changelist' %}">👤 Пользователи</a></li>
+                <li><a href="{% url 'admin:api_refreshtoken_changelist' %}">🔑 Токены обновления</a></li>
+                <li><a href="{% url 'admin:api_invitation_changelist' %}">📧 Приглашения</a></li>
+            </ul>
+        </div>
+        
+        <div class="app-card objects">
+            <h2>🏗️ Объекты строительства</h2>
+            <ul class="model-list">
+                <li><a href="{% url 'admin:api_constructionobject_changelist' %}">🏗️ Объекты</a></li>
+                <li><a href="{% url 'admin:api_objectactivation_changelist' %}">✅ Активации</a></li>
+                <li><a href="{% url 'admin:api_objectroleaudit_changelist' %}">📋 Аудит ролей</a></li>
+            </ul>
+        </div>
+        
+        <div class="app-card prescriptions">
+            <h2>⚠️ Нарушения</h2>
+            <ul class="model-list">
+                <li><a href="{% url 'admin:api_prescription_changelist' %}">⚠️ Нарушения</a></li>
+                <li><a href="{% url 'admin:api_prescriptionfix_changelist' %}">🔧 Исправления</a></li>
+            </ul>
+        </div>
+        
+        <div class="app-card deliveries">
+            <h2>🚚 Поставки</h2>
+            <ul class="model-list">
+                <li><a href="{% url 'admin:api_delivery_changelist' %}">🚚 Поставки</a></li>
+                <li><a href="{% url 'admin:api_invoice_changelist' %}">📄 Накладные</a></li>
+                <li><a href="{% url 'admin:api_material_changelist' %}">📦 Материалы</a></li>
+                <li><a href="{% url 'admin:api_laborder_changelist' %}">🧪 Заказы лаборатории</a></li>
+            </ul>
+        </div>
+        
+        <div class="app-card work-plans">
+            <h2>📋 Графики работ</h2>
+            <ul class="model-list">
+                <li><a href="{% url 'admin:api_workplan_changelist' %}">📋 Графики работ</a></li>
+                <li><a href="{% url 'admin:api_workitem_changelist' %}">🔨 Работы</a></li>
+                <li><a href="{% url 'admin:api_scheduleitem_changelist' %}">📅 Элементы графика</a></li>
+            </ul>
+        </div>
+        
+        <div class="app-card logs">
+            <h2>📝 Система</h2>
+            <ul class="model-list">
+                <li><a href="{% url 'admin:api_log_changelist' %}">📝 Логи системы</a></li>
+                <li><a href="{% url 'admin:api_area_changelist' %}">🗺️ Области/полигоны</a></li>
+                <li><a href="{% url 'admin:api_dailychecklist_changelist' %}">📋 Ежедневные чек-листы</a></li>
+                <li><a href="{% url 'admin:api_work_changelist' %}">🔨 Работы/задачи</a></li>
+                <li><a href="{% url 'admin:api_memo_changelist' %}">📝 Мемо</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

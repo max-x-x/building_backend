@@ -70,7 +70,8 @@ class RefreshTokenAdmin(admin.ModelAdmin):
 
     def jti_short(self, obj):
         """Сокращенный JTI."""
-        return f"{obj.jti[:8]}..."
+        jti_str = str(obj.jti)
+        return f"{jti_str[:8]}..."
     jti_short.short_description = "JTI"
 
     def revoked_badge(self, obj):
