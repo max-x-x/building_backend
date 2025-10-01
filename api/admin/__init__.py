@@ -4,3 +4,4 @@ from api.admin.work_plan import *
 from api.admin.notify import *
 from api.admin.prescription import *
 from api.admin.visit import *
+from api.admin.logs import *

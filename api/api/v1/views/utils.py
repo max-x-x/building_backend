@@ -22,23 +22,37 @@ class RoleRequired(BasePermission):
         return request.user.role in self.allowed_roles
 
 
-def send_notification(user_id: str | None, email: str | None, subject: str, message: str) -> None:
+def send_notification(user_id: str | None, email: str | None, subject: str, message: str, sender_name: str = None, sender_role: str = None) -> None:
     """
     Отправка уведомления во внешний сервис. Ошибки не падают наружу.
     """
+    from api.utils.logging import log_notification_sent, log_notification_failed
+    
     url = getattr(settings, "NOTIFY_SERVICE_URL", "")
     print(url)
     if not url:
+        # Логируем что URL не настроен
+        if sender_name and sender_role:
+            log_notification_failed(email, subject, "NOTIFY_SERVICE_URL не настроен", sender_name, sender_role)
         return
     try:
         payload = {
-            "user_id": user_id,
+            "user_id": str(user_id) if user_id else None,
             "email": email,
             "subject": subject,
             "message": message,
         }
         print(payload)
-        requests.post(url, json=payload, timeout=5)
-    except Exception:
+        response = requests.post(url, json=payload, timeout=5)
+        response.raise_for_status()
+        
+        # Логируем успешную отправку в БД
+        if sender_name and sender_role:
+            log_notification_sent(email, email, subject, sender_name, sender_role)
+            
+    except Exception as e:
         print(f"Failed to send notification to {email}: {subject}: {message}")
+        # Логируем ошибку отправки в БД
+        if sender_name and sender_role:
+            log_notification_failed(email, subject, str(e), sender_name, sender_role)
         pass

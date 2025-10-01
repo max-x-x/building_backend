@@ -32,6 +32,31 @@ class DailyChecklistsView(APIView):
             photos_folder_url=ser.validated_data.get("photos_folder_url",""),
             status="submitted",
         )
+        
+        # Отправляем уведомления ИКО и ССК о заполненном чек-листе
+        try:
+            from api.api.v1.views.utils import send_notification
+            if obj.iko_id and obj.iko:
+                send_notification(
+                    obj.iko_id,
+                    obj.iko.email,
+                    "Заполнен ежедневный чек-лист",
+                    f"Прораб заполнил ежедневный чек-лист для объекта '{obj.name}'",
+                    request.user.full_name,
+                    request.user.role
+                )
+            if obj.ssk_id and obj.ssk:
+                send_notification(
+                    obj.ssk_id,
+                    obj.ssk.email,
+                    "Заполнен ежедневный чек-лист",
+                    f"Прораб заполнил ежедневный чек-лист для объекта '{obj.name}'",
+                    request.user.full_name,
+                    request.user.role
+                )
+        except Exception:
+            pass
+        
         return Response(DailyChecklistOutSerializer(dc).data, status=201)
 
     def get(self, request):

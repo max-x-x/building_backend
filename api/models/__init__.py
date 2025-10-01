@@ -6,10 +6,12 @@ from api.models.prescription import Prescription, PrescriptionFix
 from api.models.visit import QrCode, VisitRequest
 from api.models.area import Area
 from api.models.delivery import Delivery, Invoice, Material, LabOrder
+from api.models.log import Log, LogLevel, LogCategory
 
 __all__ = ["Roles", "User", "RefreshToken", "Invitation",
            "ConstructionObject", "WorkPlan", "WorkItem", "ScheduleItem",
            "ObjectActivation", "Notification", "Prescription",
            "PrescriptionFix", "QrCode", "VisitRequest", "Area",
-           "Delivery", "Invoice", "Material", "LabOrder"]
+           "Delivery", "Invoice", "Material", "LabOrder",
+           "Log", "LogLevel", "LogCategory"]
 

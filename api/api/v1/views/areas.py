@@ -5,6 +5,7 @@ from rest_framework import status
 from api.models.area import Area
 from api.serializers.areas import AreaCreateSerializer, AreaOutSerializer, AreaListOutSerializer
 from api.api.v1.views.objects import _paginated
+from api.utils.logging import log_area_created, log_area_viewed
 
 
 class AreasCreateView(APIView):
@@ -17,6 +18,11 @@ class AreasCreateView(APIView):
         ser = AreaCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         area = ser.save()
+        
+        # Логируем создание полигона
+        object_name = area.object.name if area.object else "Не привязан к объекту"
+        log_area_created(area.name, object_name, request.user.full_name, request.user.role)
+        
         return Response(AreaOutSerializer(area).data, status=status.HTTP_201_CREATED)
 
 
@@ -31,6 +37,9 @@ class AreasDetailView(APIView):
             area = Area.objects.get(id=id)
         except Area.DoesNotExist:
             return Response({"detail": "Not found"}, status=404)
+        
+        # Логируем просмотр полигона
+        log_area_viewed(area.name, request.user.full_name, request.user.role)
         
         return Response(AreaOutSerializer(area).data, status=200)
 

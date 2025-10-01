@@ -10,6 +10,7 @@ from api.models.prescription import Prescription, PrescriptionFix
 # from api.models.notify import Notification  # disabled: notifications handled externally
 from api.serializers.prescription import (PrescriptionCreateSerializer, PrescriptionOutSerializer,
                                           PrescriptionFixCreateSerializer, PrescriptionListSerializer)
+from api.utils.logging import log_prescription_created, log_prescription_fixed, log_prescription_verified
 
 
 class PrescriptionsCollectionView(APIView):
@@ -58,7 +59,24 @@ class PrescriptionsCollectionView(APIView):
             pres.object.can_proceed = False
             pres.object.save(update_fields=["can_proceed"])
 
-        # notifications disabled
+        # Логируем создание нарушения
+        log_prescription_created(pres.object.name, pres.title, request.user.full_name, request.user.role)
+
+        # Отправляем уведомление прорабу о новом нарушении
+        try:
+            if pres.object.foreman_id and pres.object.foreman:
+                sender_role = "ИКО" if request.user.role == Roles.IKO else "ССК"
+                send_notification(
+                    pres.object.foreman_id,
+                    pres.object.foreman.email,
+                    "Выявлено нарушение",
+                    f"В результате проверки {sender_role} выявлено нарушение '{pres.title}' для объекта '{pres.object.name}'",
+                    request.user.full_name,
+                    request.user.role
+                )
+        except Exception:
+            pass
+
         return Response(PrescriptionOutSerializer(pres).data, status=201)
 
 
@@ -86,7 +104,24 @@ class PrescriptionFixView(APIView):
 
         pres.status = "awaiting_verification"
         pres.save(update_fields=["status"])
-        # notifications disabled
+        
+        # Логируем исправление нарушения
+        log_prescription_fixed(pres.object.name, pres.title, request.user.full_name, request.user.role)
+
+        # Отправляем уведомление автору нарушения о том, что оно исправлено
+        try:
+            if pres.author_id and pres.author != request.user:
+                send_notification(
+                    pres.author_id,
+                    pres.author.email,
+                    "Нарушение исправлено",
+                    f"Нарушение '{pres.title}' для объекта '{pres.object.name}' исправлено прорабом",
+                    request.user.full_name,
+                    request.user.role
+                )
+        except Exception:
+            pass
+
         return Response(PrescriptionOutSerializer(pres).data, status=200)
 
 
@@ -118,6 +153,9 @@ class PrescriptionVerifyView(APIView):
             pres.closed_at = timezone.now()
             pres.save(update_fields=["status", "closed_at"])
 
+            # Логируем подтверждение нарушения
+            log_prescription_verified(pres.object.name, pres.title, request.user.full_name, request.user.role, True)
+
             if pres.requires_stop:
                 has_active_stoppers = Prescription.objects.filter(object=pres.object, requires_stop=True).exclude(status="closed").exists()
                 if not has_active_stoppers:
@@ -139,6 +177,9 @@ class PrescriptionVerifyView(APIView):
                 attachments=pres.attachments,
                 status="open",
             )
+            
+            # Логируем отклонение нарушения
+            log_prescription_verified(pres.object.name, pres.title, request.user.full_name, request.user.role, False, comment)
 
         # внешние уведомления
         try:
@@ -147,10 +188,17 @@ class PrescriptionVerifyView(APIView):
                 msg = f"Нарушение #{pres.id} закрыто."
             else:
                 msg = f"Нарушение #{pres.id} отклонено. Создано новое #{new_pres.id}. Причина: {comment}"
+            
+            # Уведомляем прораба о результате проверки исправления
             if pres.object.foreman_id and pres.object.foreman:
-                send_notification(pres.object.foreman_id, pres.object.foreman.email, subj, msg)
+                if accepted:
+                    foreman_msg = f"Исправление нарушения '{pres.title}' для объекта '{pres.object.name}' принято"
+                else:
+                    foreman_msg = f"Исправление нарушения '{pres.title}' для объекта '{pres.object.name}' отклонено. Причина: {comment}"
+                send_notification(pres.object.foreman_id, pres.object.foreman.email, "Результат проверки исправления", foreman_msg, request.user.full_name, request.user.role)
+            
             if pres.object.ssk_id and pres.object.ssk:
-                send_notification(pres.object.ssk_id, pres.object.ssk.email, subj, msg)
+                send_notification(pres.object.ssk_id, pres.object.ssk.email, subj, msg, request.user.full_name, request.user.role)
         except Exception:
             pass
 

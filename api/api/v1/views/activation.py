@@ -9,6 +9,7 @@ from api.models.user import Roles
 from api.models.object import ConstructionObject, ObjectActivation, ObjectStatus
 # from api.models.notify import Notification  # disabled: notifications handled externally
 from api.serializers.activation import ActivationRequestInSerializer, ActivationOutSerializer, pick_iko
+from api.utils.logging import log_activation_requested, log_activation_approved, log_activation_rejected
 
 
 class ActivationRequestView(APIView):
@@ -47,10 +48,14 @@ class ActivationRequestView(APIView):
             ssk_checklist_pdf=ser.validated_data.get("ssk_checklist_pdf", ""),
         )
 
+        # Логируем запрос активации
+        iko_name = obj.iko.full_name if obj.iko else None
+        log_activation_requested(obj.name, request.user.full_name, request.user.role, iko_name)
+
         # уведомления внешнему сервису: ИКО — выберите дату посещения
         try:
-            if obj.iko__id and obj.iko:
-                send_notification(obj.iko__id, obj.iko.email, "Запрос активации объекта", f"Объект '{obj.name}': выберите дату посещения для активации")
+            if obj.iko_id and obj.iko:
+                send_notification(obj.iko_id, obj.iko.email, "Запрос активации объекта", f"Объект '{obj.name}': выберите дату посещения для активации", request.user.full_name, request.user.role)
         except Exception:
             pass
 
@@ -93,6 +98,10 @@ class ActivationIkoCheckView(APIView):
             act.status = "checked"
             act.rejected_reason = rejected_reason
             act.save()
+            
+            # Логируем отклонение активации
+            log_activation_rejected(obj.name, request.user.full_name, request.user.role, rejected_reason)
+            
             # уведомления отключены, обрабатываются внешним сервисом
             return Response(ActivationOutSerializer(act).data, status=200)
         else:
@@ -103,14 +112,18 @@ class ActivationIkoCheckView(APIView):
             obj.status = ObjectStatus.ACTIVE
             obj.can_proceed = True
             obj.save(update_fields=["status","can_proceed"])
+            
+            # Логируем одобрение активации
+            log_activation_approved(obj.name, request.user.full_name, request.user.role)
+            
             # уведомления внешнему сервису
             try:
                 subj = "Активация объекта одобрена"
                 msg = f"Объект '{obj.name}' активирован."
                 if obj.ssk_id and obj.ssk:
-                    send_notification(obj.ssk_id, obj.ssk.email, subj, msg)
+                    send_notification(obj.ssk_id, obj.ssk.email, subj, msg, request.user.full_name, request.user.role)
                 if obj.foreman_id and obj.foreman:
-                    send_notification(obj.foreman_id, obj.foreman.email, subj, msg)
+                    send_notification(obj.foreman_id, obj.foreman.email, subj, msg, request.user.full_name, request.user.role)
             except Exception:
                 pass
             return Response(ActivationOutSerializer(act).data, status=200)

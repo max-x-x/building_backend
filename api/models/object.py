@@ -11,6 +11,7 @@ class ObjectStatus(models.TextChoices):
     ACTIVATION_PENDING = "activation_pending", "Ожидает активации"
     ACTIVE = "active", "Активен"
     SUSPENDED = "suspended", "Приостановлен"
+    COMPLETED_BY_SSK = "completed_by_ssk", "Завершён ССК"
     COMPLETED = "completed", "Завершён"
 
 class ConstructionObject(TimeStampedMixin):

@@ -12,6 +12,7 @@ from api.models.user import RefreshToken, Roles, Invitation
 from api.serializers.auth import (LoginSerializer, LoginOutSerializer, RefreshInSerializer, RefreshOutSerializer,
                                   InviteInSerializer, InviteOutSerializer, LogoutInSerializer,
                                   RegisterByInviteInSerializer, RegisterByInviteOutSerializer)
+from api.utils.logging import log_user_login, log_user_logout
 
 User = get_user_model()
 
@@ -38,10 +39,16 @@ class AuthLoginView(APIView):
             return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
         if not user.check_password(password):
+            # Логируем неудачную попытку входа
+            log_user_login(email, "Неизвестная роль", False)
             return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
         access = create_access_token(user)
         refresh, _rt = create_refresh_token(user, user_agent=request.headers.get("User-Agent", ""), ip=_client_ip(request))
+        
+        # Логируем успешный вход
+        log_user_login(user.full_name, user.role, True)
+        
         out = LoginOutSerializer({"access": access, "refresh": refresh, "user": user})
         return Response(out.data, status=status.HTTP_200_OK)
 
@@ -110,6 +117,10 @@ class AuthLogoutView(APIView):
             rt = RefreshToken.objects.get(jti=jti, user_id=sub, revoked=False)
             rt.revoked = True
             rt.save(update_fields=["revoked"])
+            
+            # Логируем выход пользователя
+            log_user_logout(request.user.full_name, request.user.role)
+            
         except RefreshToken.DoesNotExist:
             pass
         return Response(status=204)

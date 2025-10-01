@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from api.api.v1.views.utils import RoleRequired
 from api.models.user import Roles, User
 from api.serializers.users import UserOutSerializer, UserPatchSerializer, UserCreateSerializer, UsersListOutSerializer
+from api.utils.logging import log_user_created, log_user_updated
 
 
 class UsersMeView(APIView):
@@ -56,6 +57,10 @@ class UsersDetailView(APIView):
         for k, v in data.items():
             setattr(user, k, v)
         user.save()
+        
+        # Логируем изменение пользователя
+        log_user_updated(user.full_name, user.email, user.role, request.user.full_name, request.user.role)
+        
         return Response(UserOutSerializer(user).data, status=200)
 
 
@@ -102,4 +107,8 @@ class UsersListCreateView(APIView):
             full_name=full_name,
             is_active=True,
         )
+        
+        # Логируем создание пользователя
+        log_user_created(user.full_name, user.email, user.role, request.user.full_name, request.user.role)
+        
         return Response(UserOutSerializer(user).data, status=201)

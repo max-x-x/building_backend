@@ -7,6 +7,8 @@ from api.models import Roles
 from api.serializers.objects import (ObjectCreateSerializer, ObjectOutSerializer, ObjectAssignForemanSerializer,
                                      ObjectsListOutSerializer, ObjectPatchSerializer, ObjectFullDetailSerializer)
 from api.models.object import ConstructionObject, ObjectStatus
+from api.utils.logging import log_object_created, log_object_viewed, log_object_updated, log_object_status_changed
+from api.api.v1.views.utils import send_notification
 
 
 def _visible_object_ids_for_user(user):
@@ -77,6 +79,10 @@ class ObjectsListCreateView(APIView):
         ser = ObjectCreateSerializer(data=request.data, context={"request": request})
         ser.is_valid(raise_exception=True)
         obj = ser.save()
+        
+        # Логируем создание объекта
+        log_object_created(obj.name, obj.address, request.user.full_name, request.user.role)
+        
         return Response(ObjectOutSerializer(obj).data, status=status.HTTP_201_CREATED)
 
 
@@ -100,6 +106,9 @@ class ObjectsDetailView(APIView):
         if not allowed:
             return Response({"detail": "Forbidden"}, status=403)
 
+        # Логируем просмотр объекта
+        log_object_viewed(obj.name, request.user.full_name, request.user.role)
+
         return Response(ObjectOutSerializer(obj).data, status=200)
 
     def patch(self, request, id: int):
@@ -112,10 +121,18 @@ class ObjectsDetailView(APIView):
         ser.is_valid(raise_exception=True)
         before_ssk = obj.ssk_id
         obj = ser.save()
+        
+        # Логируем изменение объекта
+        log_object_updated(obj.name, request.user.full_name, request.user.role, str(request.data))
+        
         # если привязали ССК впервые — статус в ожидание активации
         if not before_ssk and obj.ssk_id and obj.status == ObjectStatus.DRAFT:
+            old_status = "Черновик"
+            new_status = "Ожидает активации"
             obj.status = ObjectStatus.ACTIVATION_PENDING
-            obj.save(update_fields=["status"]) 
+            obj.save(update_fields=["status"])
+            log_object_status_changed(obj.name, old_status, new_status, request.user.full_name, request.user.role, "Назначен ССК")
+            
         return Response(ObjectOutSerializer(obj).data, status=200)
 
 
@@ -158,6 +175,40 @@ class ObjectResumeView(APIView):
         obj.save(update_fields=["status", "can_proceed", "modified_at"])
         return Response({"status": obj.status}, status=200)
 
+class ObjectCompleteBySSKView(APIView):
+    def post(self, request, id: int):
+        try:
+            obj = ConstructionObject.objects.get(id=id)
+        except ConstructionObject.DoesNotExist:
+            return Response({"detail": "Not found"}, status=404)
+
+        if request.user.role != Roles.SSK or obj.ssk_id != request.user.id:
+            return Response({"detail": "Only assigned SSK can complete"}, status=403)
+
+        obj.status = ObjectStatus.COMPLETED_BY_SSK
+        obj.can_proceed = False
+        obj.save(update_fields=["status", "can_proceed", "modified_at"])
+        
+        # Логируем изменение статуса
+        log_object_status_changed(obj.name, "Завершён ССК", request.user.full_name, request.user.role)
+        
+        # Отправляем уведомление ИКО
+        try:
+            if obj.iko_id and obj.iko:
+                send_notification(
+                    obj.iko_id,
+                    obj.iko.email,
+                    "Объект завершён ССК",
+                    f"Объект '{obj.name}' завершён ССК. Требуется ваше подтверждение для окончательного завершения.",
+                    request.user.full_name,
+                    request.user.role
+                )
+        except Exception:
+            pass
+        
+        return Response({"status": obj.status}, status=200)
+
+
 class ObjectCompleteView(APIView):
     def post(self, request, id: int):
         try:
@@ -167,10 +218,18 @@ class ObjectCompleteView(APIView):
 
         if request.user.role != Roles.IKO or obj.iko_id != request.user.id:
             return Response({"detail": "Only assigned IKO can complete"}, status=403)
+        
+        # ИКО может завершить только если ССК уже завершил
+        if obj.status != ObjectStatus.COMPLETED_BY_SSK:
+            return Response({"detail": "Object must be completed by SSK first"}, status=400)
 
         obj.status = ObjectStatus.COMPLETED
         obj.can_proceed = False
         obj.save(update_fields=["status", "can_proceed", "modified_at"])
+        
+        # Логируем изменение статуса
+        log_object_status_changed(obj.name, "Завершён", request.user.full_name, request.user.role)
+        
         return Response({"status": obj.status}, status=200)
 
 

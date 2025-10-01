@@ -11,6 +11,7 @@ from api.models.work_plan import WorkPlanVersion, WorkPlanChangeRequest, WorkPla
 from api.serializers.work_plan_versions import (WorkPlanDetailOutSerializer, WPVersionCreateSerializer,
                                                 WPChangeRequestCreateSerializer, WPChangeDecisionSerializer)
 from api.serializers.work_plans import WorkPlanCreateSerializer, WorkPlanOutSerializer, WorkItemSetStatusSerializer
+from api.utils.logging import log_work_plan_created, log_work_item_completed
 
 class WorkPlanCreateView(APIView):
     """
@@ -31,6 +32,10 @@ class WorkPlanCreateView(APIView):
         ser = WorkPlanCreateSerializer(data=request.data, context={"request": request})
         ser.is_valid(raise_exception=True)
         plan = ser.save()
+        
+        # Логируем создание графика работ
+        log_work_plan_created(plan.object.name, plan.title, request.user.full_name, request.user.role)
+        
         return Response(WorkPlanOutSerializer(plan).data, status=status.HTTP_201_CREATED)
 
 class WorkPlanDetailView(APIView):
@@ -145,4 +150,9 @@ class WorkItemSetStatusView(APIView):
         ser.is_valid(raise_exception=True)
         si.status = ser.validated_data["status"]
         si.save(update_fields=["status","modified_at"])
+        
+        # Логируем завершение работы
+        if si.status == "done":
+            log_work_item_completed(si.object.name, si.work_item.name, request.user.full_name, request.user.role)
+        
         return Response({"status": si.status}, status=200)

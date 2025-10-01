@@ -7,6 +7,7 @@ from api.api.v1.views.objects import _visible_object_ids_for_user, _paginated
 from api.serializers.deliveries import (DeliveryCreateSerializer, DeliveryOutSerializer, DeliveryReceiveSerializer,
                                         InvoiceCreateSerializer, ParseTTNSerializer, DeliveryStatusSerializer,
                                         LabOrderCreateSerializer, InvoiceDataSerializer, DeliveryConfirmSerializer)
+from api.utils.logging import log_delivery_created, log_delivery_received, log_delivery_accepted, log_delivery_sent_to_lab
 
 
 class DeliveriesCreateView(APIView):
@@ -27,6 +28,10 @@ class DeliveriesCreateView(APIView):
             notes=ser.validated_data.get("notes",""),
             created_by=request.user
         )
+        
+        # Логируем создание поставки
+        log_delivery_created(obj.name, d.id, request.user.full_name, request.user.role)
+        
         return Response(DeliveryOutSerializer(d).data, status=201)
 
 class DeliveryReceiveView(APIView):
@@ -234,6 +239,14 @@ class DeliveryConfirmView(APIView):
         delivery.status = expected_status
         delivery.save(update_fields=["status"])
         
+        # Логируем изменение статуса поставки
+        if expected_status == "received":
+            log_delivery_received(delivery.object.name, delivery.id, request.user.full_name, request.user.role)
+        elif expected_status == "accepted":
+            log_delivery_accepted(delivery.object.name, delivery.id, request.user.full_name, request.user.role)
+        elif expected_status == "sent_to_lab":
+            log_delivery_sent_to_lab(delivery.object.name, delivery.id, request.user.full_name, request.user.role)
+        
         # Отправляем уведомления
         from api.api.v1.views.utils import send_notification
         try:
@@ -244,7 +257,8 @@ class DeliveryConfirmView(APIView):
                         delivery.object.ssk_id,
                         delivery.object.ssk.email,
                         "Поставка принята прорабом",
-                        f"Поставка #{delivery.id} для объекта '{delivery.object.name}' принята прорабом. Требуется ваше подтверждение."
+                        f"Поставка #{delivery.id} для объекта '{delivery.object.name}' принята прорабом. Требуется ваше подтверждение.",
+                        request.user.full_name, request.user.role
                     )
             elif expected_status == "accepted":
                 # Уведомляем прораба о том, что ССК подтвердил поставку
@@ -253,7 +267,8 @@ class DeliveryConfirmView(APIView):
                         delivery.object.foreman_id,
                         delivery.object.foreman.email,
                         "Поставка подтверждена ССК",
-                        f"Поставка #{delivery.id} для объекта '{delivery.object.name}' подтверждена ССК."
+                        f"Поставка #{delivery.id} для объекта '{delivery.object.name}' подтверждена ССК.",
+                        request.user.full_name, request.user.role
                     )
             elif expected_status == "sent_to_lab":
                 # Уведомляем прораба о том, что поставка отправлена в лабораторию
@@ -262,7 +277,8 @@ class DeliveryConfirmView(APIView):
                         delivery.object.foreman_id,
                         delivery.object.foreman.email,
                         "Поставка отправлена в лабораторию",
-                        f"Поставка #{delivery.id} для объекта '{delivery.object.name}' отправлена в лабораторию."
+                        f"Поставка #{delivery.id} для объекта '{delivery.object.name}' отправлена в лабораторию.",
+                        request.user.full_name, request.user.role
                     )
         except Exception:
             pass

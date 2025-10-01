@@ -13,8 +13,8 @@ from api.api.v1.views.foremen import ForemenListView
 from api.api.v1.views.health import PingView
 from api.api.v1.views.memos import MemosView
 from api.api.v1.views.objects import (ObjectsListCreateView, ObjectsDetailView,
-                                      ObjectSuspendView, ObjectResumeView, ObjectCompleteView,
-                                      ObjectFullDetailView)
+                                    ObjectSuspendView, ObjectResumeView, ObjectCompleteBySSKView, ObjectCompleteView,
+                                    ObjectFullDetailView)
 from api.api.v1.views.prescriptions import (PrescriptionFixView, PrescriptionVerifyView,
                                             ViolationsListView, PrescriptionsDetailView,
                                             PrescriptionsCollectionView)
@@ -27,6 +27,7 @@ from api.api.v1.views.work_plans import (WorkPlanCreateView, WorkPlanDetailView,
 from api.api.v1.views.areas import AreasCreateView, AreasDetailView, AreasListView
 from api.api.v1.views.works import WorksListView, WorkCreateView
 from api.api.v1.views.admin import AdminStatsView
+from api.api.v1.views.logs import LogsListView, LogsStatsView
 
 urlpatterns = [
     # AUTH
@@ -52,6 +53,7 @@ urlpatterns = [
 
     path("objects/<int:id>/suspend",  ObjectSuspendView.as_view(),  name="object-suspend"),
     path("objects/<int:id>/resume",   ObjectResumeView.as_view(),   name="object-resume"),
+    path("objects/<int:id>/complete-by-ssk", ObjectCompleteBySSKView.as_view(), name="object-complete-by-ssk"),
     path("objects/<int:id>/complete", ObjectCompleteView.as_view(), name="object-complete"),
 
     # VISITS + QR (disabled, handled by external service)
@@ -116,6 +118,10 @@ urlpatterns = [
 
     # ADMIN STATS
     path("admin/stats", AdminStatsView.as_view(), name="admin-stats"),
+
+    # LOGS
+    path("logs", LogsListView.as_view(), name="logs-list"),
+    path("logs/stats", LogsStatsView.as_view(), name="logs-stats"),
 
     path("ping", PingView.as_view(), name="ping"),
 ]
