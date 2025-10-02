@@ -14,26 +14,11 @@ from api.serializers.work_plans import WorkPlanCreateSerializer, WorkPlanOutSeri
 from api.utils.logging import log_work_plan_created, log_work_item_completed
 
 class WorkPlanCreateView(APIView):
-    """
-    POST /api/v1/work-plans
-    Назначение: ССК объекта прикрепляет перечень работ.
-    Побочный эффект: автоматически создаётся расписание из позиций.
-    Тело:
-    {
-      "object_id": "...",
-      "title": "ЭС по договору №...",
-      "items": [
-        {"name": "Подготовка", "quantity": 1, "unit": "этап", "start_date": "2025-10-01", "end_date": "2025-10-03"},
-        {"name": "Земляные работы", "quantity": 150, "unit": "м3", "start_date": "2025-10-04", "end_date": "2025-10-10"}
-      ]
-    }
-    """
     def post(self, request):
         ser = WorkPlanCreateSerializer(data=request.data, context={"request": request})
         ser.is_valid(raise_exception=True)
         plan = ser.save()
         
-        # Логируем создание графика работ
         log_work_plan_created(plan.object.name, plan.title, request.user.full_name, request.user.role)
         
         return Response(WorkPlanOutSerializer(plan).data, status=status.HTTP_201_CREATED)
@@ -50,16 +35,13 @@ class WorkPlanDetailView(APIView):
 
 class WorkPlansListView(APIView):
     def get(self, request):
-        # Получаем объекты, доступные пользователю
         visible_object_ids = _visible_object_ids_for_user(request.user)
         qs = WorkPlan.objects.filter(object_id__in=visible_object_ids).select_related("object", "created_by").prefetch_related("items__schedule_item").order_by("-created_at")
         
-        # Фильтрация по объекту
         object_id = request.query_params.get("object_id")
         if object_id:
             qs = qs.filter(object_id=object_id)
         
-        # Поиск по названию объекта или названию графика работ
         query = request.query_params.get("query")
         if query:
             qs = qs.filter(
@@ -151,7 +133,6 @@ class WorkItemSetStatusView(APIView):
         si.status = ser.validated_data["status"]
         si.save(update_fields=["status","modified_at"])
         
-        # Логируем завершение работы
         if si.status == "done":
             log_work_item_completed(si.object.name, si.work_item.name, request.user.full_name, request.user.role)
         

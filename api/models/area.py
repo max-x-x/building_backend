@@ -4,10 +4,6 @@ from api.models.timestamp import TimeStampedMixin
 
 
 class Area(TimeStampedMixin):
-    """
-    Полигон/область для объектов строительства.
-    Хранит GeoJSON geometry (Polygon/MultiPolygon).
-    """
     uuid_area = models.UUIDField("UUID области", default=uuid.uuid4, editable=False)
     name = models.CharField("Название области", max_length=255)
     geometry = models.JSONField("GeoJSON geometry", help_text="Polygon или MultiPolygon в формате GeoJSON")
@@ -29,5 +25,4 @@ class Area(TimeStampedMixin):
         return f"{self.name} ({self.get_geometry_type()})"
     
     def get_geometry_type(self):
-        """Возвращает тип геометрии из GeoJSON."""
         return self.geometry.get("type", "Unknown") if self.geometry else "Empty"

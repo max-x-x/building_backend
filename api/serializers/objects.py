@@ -4,6 +4,7 @@ from django.db.models import Count
 from api.models.user import User, Roles
 from api.models.object import ConstructionObject, ObjectActivation
 from api.models.documents import ExecDocument, DocumentFile
+from api.models.object import ObjectRoleAudit
 from api.models.area import Area
 from api.models.work_plan import WorkPlan, WorkItem, ScheduleItem
 from api.models.delivery import Delivery, Invoice, Material
@@ -17,7 +18,6 @@ class UserBriefSerializer(serializers.ModelSerializer):
         fields = ("id", "email", "full_name", "role")
 
 class ObjectCreateSerializer(serializers.ModelSerializer):
-    # файлы документов объекта в формате base64 (принимаются с фронта)
     document_files = serializers.ListField(
         child=serializers.CharField(), 
         required=False, 
@@ -34,14 +34,11 @@ class ObjectCreateSerializer(serializers.ModelSerializer):
 
         document_files = validated_data.pop("document_files", [])
         
-        # Создаем объект
         obj = ConstructionObject.objects.create(created_by=creator, **validated_data)
         
-        # Загружаем файлы в файловое хранилище
         if document_files:
             from api.utils.file_storage import upload_object_documents_base64
             
-            # Загружаем файлы и получаем массив URL
             urls = upload_object_documents_base64(
                 document_files, 
                 obj.id, 
@@ -51,14 +48,12 @@ class ObjectCreateSerializer(serializers.ModelSerializer):
             )
             
             if urls:
-                # Сохраняем массив ссылок на документы
                 obj.documents_folder_url = urls
                 obj.save(update_fields=["documents_folder_url"])
             
         return obj
 
 class AreaBriefSerializer(serializers.ModelSerializer):
-    """Краткий сериализатор для полигона объекта."""
     geometry_type = serializers.SerializerMethodField()
     
     class Meta:
@@ -74,35 +69,43 @@ class ObjectOutSerializer(serializers.ModelSerializer):
     foreman = UserBriefSerializer(allow_null=True)
     iko = UserBriefSerializer(allow_null=True)
     areas = AreaBriefSerializer(many=True, read_only=True)
+    main_polygon = serializers.SerializerMethodField()
     work_progress = serializers.SerializerMethodField()
 
     class Meta:
         model = ConstructionObject
-        fields = ("id", "uuid_obj", "name", "address", "status", "ssk", "foreman", "iko", "can_proceed", "areas", "work_progress", "documents_folder_url", "created_at")
+        fields = ("id", "uuid_obj", "name", "address", "status", "ssk", "foreman", "iko", "can_proceed", "areas", "main_polygon", "work_progress", "documents_folder_url", "created_at")
 
     def get_work_progress(self, obj):
-        """Рассчитывает процент выполнения работ по графику."""
         try:
-            # Получаем последний график работ для объекта
             work_plan = WorkPlan.objects.filter(object=obj).order_by('-created_at').first()
             if not work_plan:
                 return 0
             
-            # Считаем общее количество работ
             total_works = WorkItem.objects.filter(plan=work_plan).count()
             if total_works == 0:
                 return 0
             
-            # Считаем выполненные работы (статус "done")
             completed_works = WorkItem.objects.filter(
                 plan=work_plan,
                 schedule_item__status="done"
             ).count()
             
-            # Возвращаем процент
             return int((completed_works / total_works) * 100)
         except Exception:
             return 0
+
+    def get_main_polygon(self, obj):
+        if obj.areas.exists():
+            main_area = obj.areas.first()
+            return {
+                "id": main_area.id,
+                "uuid_area": str(main_area.uuid_area),
+                "name": main_area.name,
+                "geometry": main_area.geometry,
+                "geometry_type": main_area.get_geometry_type()
+            }
+        return None
 
 class ObjectsListOutSerializer(serializers.Serializer):
     items = ObjectOutSerializer(many=True)
@@ -146,7 +149,6 @@ class ObjectPatchSerializer(serializers.Serializer):
     ssk_id = serializers.UUIDField(required=False, allow_null=True)
     primary_iko_id = serializers.UUIDField(required=False, allow_null=True)
     coordinates_id = serializers.IntegerField(required=False, allow_null=True)
-    # файлы документов объекта в формате base64 (принимаются с фронта)
     document_files = serializers.ListField(
         child=serializers.CharField(), 
         required=False, 
@@ -158,11 +160,9 @@ class ObjectPatchSerializer(serializers.Serializer):
         obj: ConstructionObject = self.context["object"]
         user: User = self.context["request"].user
 
-        # admin — везде; ССК — может работать с любым объектом (назначать себя и других)
         if user.role not in (Roles.ADMIN, Roles.SSK):
             raise serializers.ValidationError("Недостаточно прав")
 
-        # проверить роли, если переданы
         def _get_user(uid, role):
             if uid is None:
                 return None
@@ -184,7 +184,6 @@ class ObjectPatchSerializer(serializers.Serializer):
         return data
 
     def save(self, **kwargs):
-        from api.models.object import ObjectRoleAudit
         obj: ConstructionObject = self.context["object"]
         req = self.context["request"]
 
@@ -201,12 +200,10 @@ class ObjectPatchSerializer(serializers.Serializer):
         if "can_continue_construction" in self.validated_data:
             obj.can_proceed = bool(self.validated_data["can_continue_construction"])
 
-        # документы
         document_files = self.validated_data.get("document_files", [])
         if document_files:
             from api.utils.file_storage import upload_object_documents_base64
             
-            # Загружаем файлы и получаем массив URL
             urls = upload_object_documents_base64(
                 document_files, 
                 obj.id, 
@@ -216,12 +213,10 @@ class ObjectPatchSerializer(serializers.Serializer):
             )
             
             if urls:
-                # Сохраняем массив ссылок на документы
                 obj.documents_folder_url = urls
 
         obj.save()
 
-        # аудит смен ролей
         for field in ("ssk", "foreman", "iko"):
             if old[field] != getattr(obj, field):
                 ObjectRoleAudit.objects.create(
@@ -232,10 +227,8 @@ class ObjectPatchSerializer(serializers.Serializer):
         return obj
 
 
-# Комплексные сериализаторы для детальной информации об объекте
-
 class MaterialDetailSerializer(serializers.ModelSerializer):
-    """Детальный сериализатор для материала."""
+
     class Meta:
         model = Material
         fields = ("id", "uuid_material", "material_name", "material_quantity", 
@@ -243,7 +236,6 @@ class MaterialDetailSerializer(serializers.ModelSerializer):
                 "is_confirmed", "created_at", "modified_at")
 
 class InvoiceDetailSerializer(serializers.ModelSerializer):
-    """Детальный сериализатор для накладной."""
     materials = MaterialDetailSerializer(many=True, read_only=True)
     
     class Meta:
@@ -252,7 +244,6 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
                 "materials", "created_at", "modified_at")
 
 class DeliveryDetailSerializer(serializers.ModelSerializer):
-    """Детальный сериализатор для поставки."""
     invoices = InvoiceDetailSerializer(many=True, read_only=True)
     
     class Meta:
@@ -261,7 +252,6 @@ class DeliveryDetailSerializer(serializers.ModelSerializer):
                 "created_by", "invoices", "invoice_photos_folder_url", "created_at", "modified_at")
 
 class WorkItemDetailSerializer(serializers.ModelSerializer):
-    """Детальный сериализатор для работы в графике."""
     status = serializers.SerializerMethodField()
     
     class Meta:
@@ -277,7 +267,6 @@ class WorkItemDetailSerializer(serializers.ModelSerializer):
             return "planned"
 
 class WorkPlanDetailSerializer(serializers.ModelSerializer):
-    """Детальный сериализатор для графика работ."""
     work_items = WorkItemDetailSerializer(source="items", many=True, read_only=True)
     
     class Meta:
@@ -286,7 +275,6 @@ class WorkPlanDetailSerializer(serializers.ModelSerializer):
                 "created_at", "modified_at")
 
 class PrescriptionDetailSerializer(serializers.ModelSerializer):
-    """Детальный сериализатор для нарушения."""
     class Meta:
         model = Prescription
         fields = ("id", "title", "description", "status", "requires_stop", 
@@ -294,28 +282,28 @@ class PrescriptionDetailSerializer(serializers.ModelSerializer):
                 "created_at", "closed_at", "modified_at")
 
 class PrescriptionFixDetailSerializer(serializers.ModelSerializer):
-    """Детальный сериализатор для исправления нарушения."""
+
     class Meta:
         model = PrescriptionFix
         fields = ("id", "comment", "attachments", "fix_photos_folder_url", "author", 
                 "created_at", "modified_at")
 
 class WorkDetailSerializer(serializers.ModelSerializer):
-    """Детальный сериализатор для работы/задачи."""
+
     class Meta:
         model = Work
         fields = ("id", "uuid_work", "title", "status", "responsible", 
                 "reviewer", "created_at", "modified_at")
 
 class DailyChecklistDetailSerializer(serializers.ModelSerializer):
-    """Детальный сериализатор для ежедневного чек-листа."""
+
     class Meta:
         model = DailyChecklist
         fields = ("id", "uuid_checklist", "status", "reviewed_by", 
                 "reviewed_at", "created_at", "modified_at")
 
 class ObjectActivationDetailSerializer(serializers.ModelSerializer):
-    """Детальный сериализатор для активации объекта."""
+
     class Meta:
         model = ObjectActivation
         fields = ("id", "uuid_activation", "status", "requested_by", 
@@ -325,23 +313,21 @@ class ObjectActivationDetailSerializer(serializers.ModelSerializer):
                 "created_at", "modified_at")
 
 class ObjectFullDetailSerializer(serializers.ModelSerializer):
-    """Комплексный сериализатор для полной информации об объекте."""
     ssk = UserBriefSerializer(read_only=True)
     foreman = UserBriefSerializer(read_only=True)
     iko = UserBriefSerializer(read_only=True)
     created_by = UserBriefSerializer(read_only=True)
     areas = AreaBriefSerializer(many=True, read_only=True)
+    main_polygon = serializers.SerializerMethodField()
     work_progress = serializers.SerializerMethodField()
-    
-    # Связанные данные
+
     deliveries = DeliveryDetailSerializer(many=True, read_only=True)
     work_plans = WorkPlanDetailSerializer(many=True, read_only=True)
     prescriptions = PrescriptionDetailSerializer(many=True, read_only=True)
     works = WorkDetailSerializer(many=True, read_only=True)
     daily_checklists = DailyChecklistDetailSerializer(many=True, read_only=True)
     activations = ObjectActivationDetailSerializer(many=True, read_only=True)
-    
-    # Статистика
+
     deliveries_count = serializers.SerializerMethodField()
     work_plans_count = serializers.SerializerMethodField()
     prescriptions_count = serializers.SerializerMethodField()
@@ -352,22 +338,18 @@ class ObjectFullDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConstructionObject
         fields = (
-            # Основная информация
             "id", "uuid_obj", "name", "address", "status", "can_proceed",
-            "ssk", "foreman", "iko", "created_by", "areas", "work_progress",
+            "ssk", "foreman", "iko", "created_by", "areas", "main_polygon", "work_progress",
             "documents_folder_url", "created_at", "modified_at",
-            
-            # Связанные данные
+
             "deliveries", "work_plans", "prescriptions", "works", 
             "daily_checklists", "activations",
-            
-            # Статистика
+
             "deliveries_count", "work_plans_count", "prescriptions_count",
             "open_prescriptions_count", "works_count", "daily_checklists_count"
         )
     
     def get_work_progress(self, obj):
-        """Рассчитывает процент выполнения работ по графику."""
         try:
             work_plan = WorkPlan.objects.filter(object=obj).order_by('-created_at').first()
             if not work_plan:
@@ -385,6 +367,18 @@ class ObjectFullDetailSerializer(serializers.ModelSerializer):
             return int((completed_works / total_works) * 100)
         except Exception:
             return 0
+    
+    def get_main_polygon(self, obj):
+        if obj.areas.exists():
+            main_area = obj.areas.first()
+            return {
+                "id": main_area.id,
+                "uuid_area": str(main_area.uuid_area),
+                "name": main_area.name,
+                "geometry": main_area.geometry,
+                "geometry_type": main_area.get_geometry_type()
+            }
+        return None
     
     def get_deliveries_count(self, obj):
         return obj.deliveries.count()

@@ -83,9 +83,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class RefreshToken(TimeStampedMixin):
-    """
-    Refresh-токены с возможностью ревокации (logout).
-    """
     id = models.UUIDField("ID", primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -112,11 +109,7 @@ class RefreshToken(TimeStampedMixin):
 def _invite_expires_default():
     return timezone.now() + timedelta(days=14)
 
-# TODO убрать
 class Invitation(TimeStampedMixin):
-    """
-    Инвайт по email под конкретную роль (для онбординга).
-    """
     id = models.UUIDField("ID", primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField("Email", db_index=True)
     role = models.CharField("Роль", max_length=16, choices=Roles.choices)

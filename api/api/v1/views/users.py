@@ -18,12 +18,7 @@ class UsersMeView(APIView):
 
 
 class UsersDetailView(APIView):
-    """
-    GET /users/{id}
-    PATCH /users/{id}
-    """
     def get(self, request, id: UUID):
-        # базовое правило: admin/sysadmin или self
         if str(request.user.id) != str(id) and request.user.role != Roles.ADMIN:
             return Response({"detail": "Forbidden"}, status=403)
         try:
@@ -38,7 +33,6 @@ class UsersDetailView(APIView):
         except User.DoesNotExist:
             return Response({"detail": "User not found"}, status=404)
 
-        # права: admin/sysadmin — всё; self — только контакты
         is_self = str(request.user.id) == str(id)
         if not is_self and request.user.role != Roles.ADMIN:
             return Response({"detail": "Forbidden"}, status=403)
@@ -48,7 +42,6 @@ class UsersDetailView(APIView):
         data = ser.validated_data
 
         if is_self and request.user.role != Roles.ADMIN:
-            # self может менять только контакты
             data = {k: v for k, v in data.items() if k in {"full_name", "phone"}}
 
         if "role" in data and request.user.role != Roles.ADMIN:
@@ -58,7 +51,6 @@ class UsersDetailView(APIView):
             setattr(user, k, v)
         user.save()
         
-        # Логируем изменение пользователя
         log_user_updated(user.full_name, user.email, user.role, request.user.full_name, request.user.role)
         
         return Response(UserOutSerializer(user).data, status=200)
@@ -108,7 +100,6 @@ class UsersListCreateView(APIView):
             is_active=True,
         )
         
-        # Логируем создание пользователя
         log_user_created(user.full_name, user.email, user.role, request.user.full_name, request.user.role)
         
         return Response(UserOutSerializer(user).data, status=201)

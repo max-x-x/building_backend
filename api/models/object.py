@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.conf import settings
 
 from api.models.timestamp import TimeStampedMixin
-from api.models.user import User  # твой кастомный юзер
+from api.models.user import User
 
 class ObjectStatus(models.TextChoices):
     DRAFT = "draft", "Черновик"
@@ -38,7 +38,6 @@ class ConstructionObject(TimeStampedMixin):
         null=True, blank=True, on_delete=models.SET_NULL, related_name="created_objects"
     )
     
-    # Ссылки на файловое хранилище
     documents_folder_url = models.JSONField("URL папки с документами объекта", default=list, blank=True, help_text="Массив ссылок на документы объекта в файловом хранилище")
 
     class Meta:
@@ -51,11 +50,6 @@ class ConstructionObject(TimeStampedMixin):
 
 
 class ObjectActivation(TimeStampedMixin):
-    """
-    Заявка на активацию объекта:
-    - создаёт ССК
-    - согласует ИКО (выезд, чек-лист)
-    """
     STATUS = (
         ("requested", "Заявка отправлена (ССК)"),
         ("visit_planned", "Визит ИКО запланирован"),
@@ -90,9 +84,6 @@ class ObjectActivation(TimeStampedMixin):
 
 
 class ObjectRoleAudit(TimeStampedMixin):
-    """
-    Аудит смены ответственных по объекту.
-    """
     FIELD = (
         ("ssk", "ССК"),
         ("foreman", "Прораб"),

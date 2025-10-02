@@ -17,7 +17,6 @@ class ActivationOutSerializer(serializers.ModelSerializer):
 
 
 def pick_iko():
-    # ИКО с минимальной загрузкой (по количеству объектов, где он iko)
     return User.objects.filter(role=Roles.IKO, is_active=True).annotate(
         cnt=Count("iko_objects")
     ).order_by("cnt", "date_joined").first()

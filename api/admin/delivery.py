@@ -47,14 +47,13 @@ class DeliveryAdmin(admin.ModelAdmin):
     )
 
     def status_badge(self, obj):
-        """Отображает статус поставки с цветным бейджем."""
         colors = {
-            "scheduled": "#6c757d",    # серый
-            "received": "#ffc107",      # желтый
-            "accepted": "#28a745",      # зеленый
-            "rejected": "#dc3545",      # красный
-            "sent_to_lab": "#17a2b8",   # голубой
-            "awaiting_lab": "#6f42c1",  # фиолетовый
+            "scheduled": "#6c757d",
+            "received": "#ffc107",
+            "accepted": "#28a745",
+            "rejected": "#dc3545",
+            "sent_to_lab": "#17a2b8",
+            "awaiting_lab": "#6f42c1",
         }
         color = colors.get(obj.status, "#6c757d")
         return format_html(
@@ -91,14 +90,12 @@ class InvoiceAdmin(admin.ModelAdmin):
     )
 
     def pdf_url_short(self, obj):
-        """Сокращенный URL PDF."""
         if obj.pdf_url and len(obj.pdf_url) > 30:
             return f"{obj.pdf_url[:30]}..."
         return obj.pdf_url or "—"
     pdf_url_short.short_description = "PDF URL"
 
     def folder_url_short(self, obj):
-        """Сокращенный URL папки."""
         if obj.folder_url and len(obj.folder_url) > 30:
             return f"{obj.folder_url[:30]}..."
         return obj.folder_url or "—"
@@ -134,7 +131,6 @@ class MaterialAdmin(admin.ModelAdmin):
     )
 
     def is_confirmed_badge(self, obj):
-        """Статус подтверждения материала."""
         if obj.is_confirmed:
             return format_html('<span style="color: #28a745;">✅ Подтвержден</span>')
         return format_html('<span style="color: #ffc107;">⏳ Ожидает</span>')
@@ -167,12 +163,11 @@ class LabOrderAdmin(admin.ModelAdmin):
     )
 
     def status_badge(self, obj):
-        """Отображает статус заказа лаборатории с цветным бейджем."""
         colors = {
-            "pending": "#ffc107",    # желтый
-            "sent": "#17a2b8",      # голубой
-            "completed": "#28a745",  # зеленый
-            "failed": "#dc3545",    # красный
+            "pending": "#ffc107",
+            "sent": "#17a2b8",
+            "completed": "#28a745",
+            "failed": "#dc3545",
         }
         color = colors.get(obj.status, "#6c757d")
         return format_html(

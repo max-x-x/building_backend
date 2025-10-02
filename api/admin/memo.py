@@ -25,7 +25,6 @@ class MemoAdmin(admin.ModelAdmin):
     )
 
     def pdf_url_short(self, obj):
-        """Сокращенный URL PDF."""
         if obj.pdf_url and len(obj.pdf_url) > 50:
             return f"{obj.pdf_url[:50]}..."
         return obj.pdf_url or "—"

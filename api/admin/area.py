@@ -30,13 +30,12 @@ class AreaAdmin(admin.ModelAdmin):
     )
 
     def geometry_type_badge(self, obj):
-        """Отображает тип геометрии с цветным бейджем."""
         geometry_type = obj.get_geometry_type()
         colors = {
-            "Polygon": "#28a745",        # зеленый
-            "MultiPolygon": "#17a2b8",   # голубой
-            "Point": "#ffc107",          # желтый
-            "LineString": "#007bff",     # синий
+            "Polygon": "#28a745",
+            "MultiPolygon": "#17a2b8",
+            "Point": "#ffc107",
+            "LineString": "#007bff",
         }
         color = colors.get(geometry_type, "#6c757d")
         return format_html(

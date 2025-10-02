@@ -38,7 +38,7 @@ class TicketSetStatusView(APIView):
         if new_status not in ("open","in_progress","done"):
             return Response({"detail":"bad status"}, status=400)
         try:
-            t = Ticket.objects.get(uuid_ticket=id)  # принимаем UUID из пути
+            t = Ticket.objects.get(uuid_ticket=id)
         except Ticket.DoesNotExist:
             return Response({"detail":"Not found"}, status=404)
         t.status = new_status

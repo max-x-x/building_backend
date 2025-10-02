@@ -63,9 +63,6 @@ def decode_token(token: str) -> dict:
 
 
 class JWTAuthentication(BaseAuthentication):
-    """
-    DRF auth: Authorization: Bearer <access>
-    """
     keyword = b"Bearer"
 
     def authenticate(self, request):

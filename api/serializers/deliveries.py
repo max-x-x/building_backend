@@ -7,7 +7,6 @@ class DeliveryCreateSerializer(serializers.Serializer):
     object_id = serializers.IntegerField()
     planned_date = serializers.DateField(required=False)
     notes = serializers.CharField(required=False, allow_blank=True)
-    # фото накладных в формате base64 (принимаются с фронта)
     invoice_photos = serializers.ListField(
         child=serializers.CharField(), 
         required=False, 
@@ -18,38 +17,30 @@ class DeliveryCreateSerializer(serializers.Serializer):
         from api.models.delivery import Delivery
         from api.utils.file_storage import upload_invoice_photos_base64
         
-        # Извлекаем invoice_photos из validated_data, так как это поле не существует в модели
         invoice_photos = self.validated_data.pop("invoice_photos", [])
         
-        # Создаем поставку с дополнительными параметрами
         delivery = Delivery.objects.create(**self.validated_data, **kwargs)
         
-        # Загружаем фото в файловое хранилище
         if invoice_photos:
-            # Получаем информацию о пользователе из контекста
             request = self.context.get("request")
             user_name = request.user.full_name if request and request.user else "Система"
             user_role = request.user.role if request and request.user else "system"
             
-            # Загружаем фото и получаем массив URL
             urls = upload_invoice_photos_base64(invoice_photos, delivery.object_id, delivery.id, user_name, user_role)
             
             if urls:
-                # Сохраняем массив ссылок на фото
                 delivery.invoice_photos_folder_url = urls
                 delivery.save(update_fields=["invoice_photos_folder_url"])
         
         return delivery
 
 class MaterialSerializer(serializers.ModelSerializer):
-    """Сериализатор для материала."""
     class Meta:
         model = Material
         fields = ("id", "uuid_material", "material_name", "material_quantity", "material_size", 
                 "material_volume", "material_netto", "is_confirmed", "created_at", "modified_at")
 
 class InvoiceSerializer(serializers.ModelSerializer):
-    """Сериализатор для накладной с материалами."""
     materials = MaterialSerializer(many=True, read_only=True)
     
     class Meta:
@@ -57,7 +48,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
         fields = ("id", "uuid_invoice", "pdf_url", "folder_url", "data", "materials", "created_at", "modified_at")
 
 class DeliveryOutSerializer(serializers.ModelSerializer):
-    """Сериализатор для поставки с накладными и материалами."""
     invoices = InvoiceSerializer(many=True, read_only=True)
     materials = MaterialSerializer(many=True, read_only=True)
     
@@ -69,7 +59,6 @@ class DeliveryOutSerializer(serializers.ModelSerializer):
 class DeliveryReceiveSerializer(serializers.Serializer):
     object_id = serializers.IntegerField()
     notes = serializers.CharField(required=False, allow_blank=True)
-    # фото накладных в формате base64 (принимаются с фронта)
     invoice_photos = serializers.ListField(
         child=serializers.CharField(), 
         required=False, 
@@ -78,14 +67,13 @@ class DeliveryReceiveSerializer(serializers.Serializer):
 
 class InvoiceCreateSerializer(serializers.Serializer):
     object_id = serializers.IntegerField()
-    delivery_id = serializers.IntegerField(required=False)  # будем принимать по int id из БД
-    delivery_uuid = serializers.UUIDField(required=False)   # альтернативно по uuid_delivery
+    delivery_id = serializers.IntegerField(required=False)
+    delivery_uuid = serializers.UUIDField(required=False)
     pdf_url = serializers.URLField()
     folder_url = serializers.URLField(required=False, allow_blank=True)
     data = serializers.JSONField(required=False)
 
 class InvoiceDataSerializer(serializers.Serializer):
-    """Сериализатор для данных от внешнего сервиса CV."""
     delivery_id = serializers.IntegerField()
     folder_url = serializers.URLField()
     materials_data = serializers.ListField(
@@ -94,14 +82,12 @@ class InvoiceDataSerializer(serializers.Serializer):
     )
 
 class MaterialUpdateSerializer(serializers.ModelSerializer):
-    """Сериализатор для обновления материала."""
     class Meta:
         model = Material
         fields = ("material_name", "material_quantity", "material_size", 
                  "material_volume", "material_netto", "is_confirmed")
 
 class DeliveryConfirmSerializer(serializers.Serializer):
-    """Сериализатор для подтверждения поставки."""
     materials = MaterialUpdateSerializer(many=True)
     status = serializers.ChoiceField(choices=["received", "accepted", "sent_to_lab"])
 
@@ -115,5 +101,5 @@ class DeliveryStatusSerializer(serializers.Serializer):
 class LabOrderCreateSerializer(serializers.Serializer):
     delivery_id = serializers.IntegerField(required=False)
     delivery_uuid = serializers.UUIDField(required=False)
-    items = serializers.ListField(child=serializers.DictField())  # [{invoice_item_id,sample_code}]
+    items = serializers.ListField(child=serializers.DictField())
     lab_id = serializers.CharField(required=False, allow_blank=True)

@@ -4,15 +4,9 @@ from rest_framework.response import Response
 
 from api.api.v1.views.utils import RoleRequired
 from api.models.user import Roles, User
-from api.serializers.users import UsersListOutSerializer, UserOutSerializer  # уже есть
+from api.serializers.users import UsersListOutSerializer, UserOutSerializer
 
 class ForemenListView(APIView):
-    """
-    GET /api/v1/foremen
-    Назначение: получить список всех прорабов.
-    Кто: admin, ssk, iko (прорабам обычно не нужно, но можно оставить при желании).
-    Фильтры: ?query=...&limit=20&offset=0
-    """
     permission_classes = [RoleRequired.as_permitted(Roles.ADMIN, Roles.SSK, Roles.IKO)]
 
     def get(self, request):

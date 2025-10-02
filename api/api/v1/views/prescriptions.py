@@ -7,23 +7,17 @@ from api.api.v1.views.objects import _visible_object_ids_for_user, _paginated
 from api.api.v1.views.utils import RoleRequired, send_notification
 from api.models.user import Roles
 from api.models.prescription import Prescription, PrescriptionFix
-# from api.models.notify import Notification  # disabled: notifications handled externally
+from api.models.notify import Notification
 from api.serializers.prescription import (PrescriptionCreateSerializer, PrescriptionOutSerializer,
                                           PrescriptionFixCreateSerializer, PrescriptionListSerializer)
 from api.utils.logging import log_prescription_created, log_prescription_fixed, log_prescription_verified
 
 
 class PrescriptionsCollectionView(APIView):
-    """
-    GET  /prescriptions         — список (фильтры те же, что и раньше)
-    POST /prescriptions         — создать предписание
-    """
-    # GET: видят свои объекты. POST: ИКО/ССК/Admin
     def get(self, request):
         object_ids = _visible_object_ids_for_user(request.user)
         qs = Prescription.objects.filter(object_id__in=object_ids).prefetch_related('fixes').order_by("-created_at")
 
-        # те же фильтры, что были:
         object_id = request.query_params.get("object_id")
         if object_id:
             qs = qs.filter(object_id=object_id)
@@ -45,7 +39,6 @@ class PrescriptionsCollectionView(APIView):
 
     permission_classes_post = [RoleRequired.as_permitted(Roles.IKO, Roles.SSK, Roles.ADMIN)]
     def post(self, request):
-        # ручная проверка прав для POST (чтобы не мешать GET)
         for perm in self.permission_classes_post:
             if not perm().has_permission(request, self):
                 from rest_framework.exceptions import PermissionDenied
@@ -59,10 +52,8 @@ class PrescriptionsCollectionView(APIView):
             pres.object.can_proceed = False
             pres.object.save(update_fields=["can_proceed"])
 
-        # Логируем создание нарушения
         log_prescription_created(pres.object.name, pres.title, request.user.full_name, request.user.role)
 
-        # Отправляем уведомление прорабу о новом нарушении
         try:
             if pres.object.foreman_id and pres.object.foreman:
                 sender_role = "ИКО" if request.user.role == Roles.IKO else "ССК"
@@ -81,10 +72,6 @@ class PrescriptionsCollectionView(APIView):
 
 
 class PrescriptionFixView(APIView):
-    """
-    POST /api/v1/prescriptions/<int:id>/fix
-    Кто: Прораб (или admin)
-    """
     permission_classes = [RoleRequired.as_permitted(Roles.FOREMAN, Roles.ADMIN)]
 
     @transaction.atomic
@@ -105,10 +92,8 @@ class PrescriptionFixView(APIView):
         pres.status = "awaiting_verification"
         pres.save(update_fields=["status"])
         
-        # Логируем исправление нарушения
         log_prescription_fixed(pres.object.name, pres.title, request.user.full_name, request.user.role)
 
-        # Отправляем уведомление автору нарушения о том, что оно исправлено
         try:
             if pres.author_id and pres.author != request.user:
                 send_notification(
@@ -126,11 +111,6 @@ class PrescriptionFixView(APIView):
 
 
 class PrescriptionVerifyView(APIView):
-    """
-    POST /api/v1/prescriptions/<int:id>/verify
-    Кто: автор предписания (ИКО/ССК) или admin
-    Тело: { "accepted": true/false, "comment": "..." }
-    """
     permission_classes = [RoleRequired.as_permitted(Roles.IKO, Roles.SSK, Roles.ADMIN)]
 
     @transaction.atomic
@@ -153,7 +133,6 @@ class PrescriptionVerifyView(APIView):
             pres.closed_at = timezone.now()
             pres.save(update_fields=["status", "closed_at"])
 
-            # Логируем подтверждение нарушения
             log_prescription_verified(pres.object.name, pres.title, request.user.full_name, request.user.role, True)
 
             if pres.requires_stop:
@@ -162,7 +141,6 @@ class PrescriptionVerifyView(APIView):
                     pres.object.can_proceed = True
                     pres.object.save(update_fields=["can_proceed"])
         else:
-            # автоклон при отклонении: текущее закрываем и создаём новое открытое
             pres.status = "closed"
             pres.closed_at = timezone.now()
             pres.save(update_fields=["status", "closed_at"])
@@ -178,18 +156,15 @@ class PrescriptionVerifyView(APIView):
                 status="open",
             )
             
-            # Логируем отклонение нарушения
             log_prescription_verified(pres.object.name, pres.title, request.user.full_name, request.user.role, False, comment)
 
-        # внешние уведомления
         try:
             subj = "Статус нарушения обновлён"
             if accepted:
                 msg = f"Нарушение #{pres.id} закрыто."
             else:
                 msg = f"Нарушение #{pres.id} отклонено. Создано новое #{new_pres.id}. Причина: {comment}"
-            
-            # Уведомляем прораба о результате проверки исправления
+ 
             if pres.object.foreman_id and pres.object.foreman:
                 if accepted:
                     foreman_msg = f"Исправление нарушения '{pres.title}' для объекта '{pres.object.name}' принято"
@@ -205,16 +180,11 @@ class PrescriptionVerifyView(APIView):
         return Response(PrescriptionOutSerializer(pres).data, status=200)
 
 class ViolationsListView(APIView):
-    """
-    GET /api/v1/violations?object_id=&only_open=&requires_stop=
-    Нарушения = предписания (с возможностью отфильтровать только открытые).
-    """
     def get(self, request):
         object_ids = _visible_object_ids_for_user(request.user)
 
         qs = Prescription.objects.filter(object_id__in=object_ids).prefetch_related('fixes').order_by("-created_at")
 
-        # фильтры
         object_id = request.query_params.get("object_id")
         if object_id:
             qs = qs.filter(object_id=object_id)
@@ -235,10 +205,6 @@ class ViolationsListView(APIView):
 
 
 class PrescriptionsDetailView(APIView):
-    """
-    GET /api/v1/prescriptions/<int:id>
-    Детали предписания (если у пользователя есть доступ к объекту).
-    """
     def get(self, request, id: int):
         object_ids = _visible_object_ids_for_user(request.user)
         try:

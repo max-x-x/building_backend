@@ -5,11 +5,7 @@ from django.conf import settings
 from api.models.timestamp import TimeStampedMixin
 from api.models.object import ConstructionObject
 
-# TODO убрать
 class Notification(TimeStampedMixin):
-    """
-    Уведомление (для пользователей/ролей по объекту).
-    """
     TYPE = (
         ("activation_requested", "Запрошена активация"),
         ("iko_assigned", "Назначен ИКО"),

@@ -17,25 +17,9 @@ Readable = Union[bytes, str, Any]  # Любой файловый объект
 
 
 class FileStorageClient:
-    """
-    Клиент для работы с твоим S3/MinIO media сервисом.
-
-    Эндпоинты:
-      - POST /upload/docs/object/{object_id}                  (multipart PDF)
-      - POST /upload/foreman/visit/{foreman_id}               (JSON {photos_base64[, date]})
-      - POST /upload/violation/{tag}/{entity_id}/creation     (JSON {photos_base64[, date]})
-      - POST /upload/violation/{violation_id}/correction/by-foreman/{foreman_id} (JSON {photos_base64[, date]})
-      - POST /upload/delivery/{object_id}/{delivery_id}       (JSON {photos_base64[, date]})
-
-    Обход (browse):
-      - GET  /browse/object/{object_id}
-      - GET  /browse/foreman/{foreman_id}
-      - GET  /browse/violation/{tag}/{entity_id}
-    """
 
     def __init__(self):
         self.base_url: str = getattr(settings, "FILE_STORAGE_URL", "https://building-s3-api.itc-hub.ru").rstrip("/")
-        # токен можно хранить в любом из этих настроек — возьмём что найдём
         self.token: Optional[str] = (
             getattr(settings, "FILE_STORAGE_TOKEN", None)
             or getattr(settings, "FILE_STORAGE_UPLOAD_TOKEN", None)
@@ -43,8 +27,6 @@ class FileStorageClient:
         )
         self.timeout: int = int(getattr(settings, "FILE_STORAGE_TIMEOUT", 30))
         self.session = requests.Session()
-
-    # --------------------------- helpers ---------------------------
 
     def _headers(self) -> Dict[str, str]:
         if not self.token:
@@ -59,19 +41,14 @@ class FileStorageClient:
         if d is None:
             return None
         if isinstance(d, str):
-            return d  # ожидается YYYY-MM-DD
+            return d
         return d.isoformat()
 
     @staticmethod
     def _read_bytes(file: Readable) -> Tuple[bytes, Optional[str], Optional[str]]:
-        """
-        Универсально читаем содержимое и пытаемся понять имя/контент-тайп.
-        Возвращает (data, filename, content_type).
-        """
         filename: Optional[str] = None
         content_type: Optional[str] = None
 
-        # путь на диске
         if isinstance(file, str):
             filename = file
             with open(file, "rb") as f:
@@ -79,24 +56,19 @@ class FileStorageClient:
             content_type = mimetypes.guess_type(filename)[0] or None
             return data, filename, content_type
 
-        # «сырые» байты
         if isinstance(file, (bytes, bytearray)):
             return bytes(file), None, None
 
-        # file-like (InMemoryUploadedFile/TemporaryUploadedFile/BytesIO и т.п.)
-        # у Django-файлов есть .name и .content_type
         try:
             if hasattr(file, "name"):
                 filename = getattr(file, "name")
             if hasattr(file, "content_type"):
                 content_type = getattr(file, "content_type")
-            # читаем
             if hasattr(file, "seek"):
                 file.seek(0)
             data = file.read()
             return data, filename, content_type
         except Exception:
-            # как крайний случай — попробуем .read() напрямую
             data = file.read()
             return data, filename, content_type
 
@@ -107,29 +79,18 @@ class FileStorageClient:
         return f"data:{mt};base64,{b64}"
 
     def _encode_images(self, files: List[Readable]) -> List[str]:
-        """
-        Готовит массив data URL (base64) для JSON ручек.
-        """
         out: List[str] = []
         for f in files:
             data, filename, content_type = self._read_bytes(f)
-            # если тип не известен — пробуем угадать по расширению
             if not content_type and filename:
                 content_type = mimetypes.guess_type(filename)[0] or None
-            # ограничим поддерживаемое (сервер прозрачно примет и другие, но лучше явно)
             if content_type not in {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"}:
                 content_type = "image/jpeg"
             out.append(self._to_data_url(data, content_type))
         return out
 
-    # --------------------------- uploads ---------------------------
 
     def upload_object_pdf(self, object_id: Union[int, str], file: Readable) -> Optional[Dict]:
-        """
-        POST /upload/docs/object/{object_id}
-        Multipart поле: file
-        Возвращает UploadedFile (dict) или None при ошибке.
-        """
         url = f"{self.base_url}/upload/docs/object/{object_id}"
         try:
             data, filename, content_type = self._read_bytes(file)
@@ -159,10 +120,6 @@ class FileStorageClient:
         images: List[Readable],
         date: Optional[Union[str, dt_date]] = None,
     ) -> Optional[Dict]:
-        """
-        POST /upload/foreman/visit/{foreman_id}
-        JSON: { "photos_base64": [...], "date": "YYYY-MM-DD" (необязательно) }
-        """
         url = f"{self.base_url}/upload/foreman/visit/{foreman_id}"
         payload: Dict = {"photos_base64": self._encode_images(images)}
         iso = self._ensure_iso_date(date)
@@ -185,15 +142,11 @@ class FileStorageClient:
 
     def upload_violation_creation(
         self,
-        tag: str,  # "ССК" | "ИКО"
+        tag: str,
         entity_id: Union[int, str],
         images: List[Readable],
         date: Optional[Union[str, dt_date]] = None,
     ) -> Optional[Dict]:
-        """
-        POST /upload/violation/{tag}/{entity_id}/creation
-        JSON: { "photos_base64": [...], "date": "YYYY-MM-DD" (необязательно) }
-        """
         url = f"{self.base_url}/upload/violation/{tag}/{entity_id}/creation"
         payload: Dict = {"photos_base64": self._encode_images(images)}
         iso = self._ensure_iso_date(date)
@@ -221,10 +174,6 @@ class FileStorageClient:
         images: List[Readable],
         date: Optional[Union[str, dt_date]] = None,
     ) -> Optional[Dict]:
-        """
-        POST /upload/violation/{violation_id}/correction/by-foreman/{foreman_id}
-        JSON: { "photos_base64": [...], "date": "YYYY-MM-DD" (необязательно) }
-        """
         url = f"{self.base_url}/upload/violation/{violation_id}/correction/by-foreman/{foreman_id}"
         payload: Dict = {"photos_base64": self._encode_images(images)}
         iso = self._ensure_iso_date(date)
@@ -252,10 +201,6 @@ class FileStorageClient:
         images: List[Readable],
         date: Optional[Union[str, dt_date]] = None,
     ) -> Optional[Dict]:
-        """
-        POST /upload/delivery/{object_id}/{delivery_id}
-        JSON: { "photos_base64": [...], "date": "YYYY-MM-DD" (необязательно) }
-        """
         url = f"{self.base_url}/upload/delivery/{object_id}/{delivery_id}"
         payload: Dict = {"photos_base64": self._encode_images(images)}
         iso = self._ensure_iso_date(date)
@@ -276,18 +221,7 @@ class FileStorageClient:
             log_file_storage_connection_failed("upload_delivery_photos", str(e))
         return None
 
-    # --------------------------- browse ---------------------------
-
     def browse_object(self, object_id: Union[int, str]) -> Optional[Dict]:
-        """
-        GET /browse/object/{object_id}
-        Возвращает:
-        {
-          "object_id": "...",
-          "documentation": TreeNode,
-          "deliveries": TreeNode
-        }
-        """
         url = f"{self.base_url}/browse/object/{object_id}"
         try:
             resp = self.session.get(url, headers=self._headers(), timeout=self.timeout)
@@ -304,10 +238,6 @@ class FileStorageClient:
         return None
 
     def browse_foreman(self, foreman_id: Union[int, str]) -> Optional[Dict]:
-        """
-        GET /browse/foreman/{foreman_id}
-        Возвращает TreeNode
-        """
         url = f"{self.base_url}/browse/foreman/{foreman_id}"
         try:
             resp = self.session.get(url, headers=self._headers(), timeout=self.timeout)
@@ -324,10 +254,6 @@ class FileStorageClient:
         return None
 
     def browse_violation(self, tag: str, entity_id: Union[int, str]) -> Optional[Dict]:
-        """
-        GET /browse/violation/{tag}/{entity_id}
-        Возвращает TreeNode
-        """
         url = f"{self.base_url}/browse/violation/{tag}/{entity_id}"
         try:
             resp = self.session.get(url, headers=self._headers(), timeout=self.timeout)
@@ -344,37 +270,26 @@ class FileStorageClient:
         return None
 
 
-# Глобальный экземпляр клиента
 file_storage_client = FileStorageClient()
 
 
-# === ФУНКЦИИ-ОБЕРТКИ ДЛЯ ИНТЕГРАЦИИ С API ===
 
 def upload_object_documents_base64(base64_files: List[str], object_id: int, object_name: str = None, user_name: str = None, user_role: str = None) -> Optional[List[str]]:
-    """
-    Загружает документы объекта в файловое хранилище из base64.
-    Использует upload_object_pdf для каждого файла.
-    Возвращает список URL всех загруженных файлов.
-    """
     from api.utils.logging import log_object_documents_uploaded, log_object_documents_upload_failed
     
     uploaded_urls = []
     
     for i, base64_data in enumerate(base64_files):
-        # Декодируем base64 в байты
         try:
             import base64
-            # Убираем префикс data:image/...;base64, если есть
             if ',' in base64_data:
                 base64_data = base64_data.split(',', 1)[1]
-            # Добавляем padding если необходимо
             missing_padding = len(base64_data) % 4
             if missing_padding:
                 base64_data += '=' * (4 - missing_padding)
             file_data = base64.b64decode(base64_data)
             result = file_storage_client.upload_object_pdf(object_id, file_data)
             if result and result.get('files') and len(result['files']) > 0:
-                # Получаем URL из первого файла (может быть url или presigned_url)
                 file_info = result['files'][0]
                 file_url = file_info.get('url') or file_info.get('presigned_url')
                 if file_url:
@@ -383,7 +298,6 @@ def upload_object_documents_base64(base64_files: List[str], object_id: int, obje
             from api.utils.logging import log_message, LogLevel, LogCategory
             log_message(LogLevel.ERROR, LogCategory.FILE_STORAGE, f"Ошибка декодирования base64 файла {i+1}: {str(e)}")
     
-    # Логируем результат
     if uploaded_urls:
         if object_name and user_name and user_role:
             log_object_documents_uploaded(object_name, object_id, f"{len(uploaded_urls)} файлов", user_name, user_role, len(base64_files))
@@ -395,10 +309,6 @@ def upload_object_documents_base64(base64_files: List[str], object_id: int, obje
 
 
 def upload_object_documents(files: List[Readable], object_id: int, object_name: str = None, user_name: str = None, user_role: str = None) -> Optional[str]:
-    """
-    Загружает документы объекта в файловое хранилище.
-    Использует upload_object_pdf для каждого файла.
-    """
     from api.utils.logging import log_object_documents_uploaded, log_object_documents_upload_failed
     
     uploaded_urls = []
@@ -408,7 +318,6 @@ def upload_object_documents(files: List[Readable], object_id: int, object_name: 
         if result and result.get('url'):
             uploaded_urls.append(result['url'])
     
-    # Логируем результат
     if uploaded_urls:
         folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
         if object_name and user_name and user_role:
@@ -421,17 +330,10 @@ def upload_object_documents(files: List[Readable], object_id: int, object_name: 
 
 
 def upload_violation_photos_base64(base64_files: List[str], prescription_id: int, prescription_title: str = None, user_name: str = None, user_role: str = None) -> Optional[List[str]]:
-    """
-    Загружает фото нарушения в файловое хранилище из base64.
-    Использует upload_violation_creation для каждого файла.
-    Возвращает список URL всех загруженных файлов.
-    """
     from api.utils.logging import log_violation_photos_uploaded, log_violation_photos_upload_failed, log_message, LogLevel, LogCategory
     
-    # Определяем тег по роли пользователя
     tag = "ССК" if user_role == "ssk" else "ИКО" if user_role == "iko" else "ССК"
     
-    # Логируем начало процесса
     log_message(
         LogLevel.INFO, 
         LogCategory.FILE_STORAGE, 
@@ -447,13 +349,10 @@ def upload_violation_photos_base64(base64_files: List[str], prescription_id: int
             f"Загружаем файл {i+1}/{len(base64_files)} для нарушения {prescription_id}"
         )
         
-        # Декодируем base64 в байты
         try:
             import base64
-            # Убираем префикс data:image/...;base64, если есть
             if ',' in base64_data:
                 base64_data = base64_data.split(',', 1)[1]
-            # Добавляем padding если необходимо
             missing_padding = len(base64_data) % 4
             if missing_padding:
                 base64_data += '=' * (4 - missing_padding)
@@ -461,7 +360,6 @@ def upload_violation_photos_base64(base64_files: List[str], prescription_id: int
             result = file_storage_client.upload_violation_creation(tag, prescription_id, [file_data])
             
             if result and result.get('files') and len(result['files']) > 0:
-                # Получаем URL из первого файла (может быть url или presigned_url)
                 file_info = result['files'][0]
                 file_url = file_info.get('url') or file_info.get('presigned_url')
                 if file_url:
@@ -490,7 +388,6 @@ def upload_violation_photos_base64(base64_files: List[str], prescription_id: int
                 f"Ошибка декодирования base64 файла {i+1} для нарушения {prescription_id}: {str(e)}"
             )
     
-    # Логируем итоговый результат
     if uploaded_urls:
         if prescription_title and user_name and user_role:
             log_violation_photos_uploaded(prescription_title, prescription_id, f"{len(uploaded_urls)} файлов", user_name, user_role, len(base64_files))
@@ -514,16 +411,10 @@ def upload_violation_photos_base64(base64_files: List[str], prescription_id: int
 
 
 def upload_violation_photos(files: List[Readable], prescription_id: int, prescription_title: str = None, user_name: str = None, user_role: str = None) -> Optional[str]:
-    """
-    Загружает фото нарушения в файловое хранилище.
-    Использует upload_violation_creation для каждого файла.
-    """
     from api.utils.logging import log_violation_photos_uploaded, log_violation_photos_upload_failed, log_message, LogLevel, LogCategory
     
-    # Определяем тег по роли пользователя
     tag = "ССК" if user_role == "ssk" else "ИКО" if user_role == "iko" else "ССК"
     
-    # Логируем начало процесса
     log_message(
         LogLevel.INFO, 
         LogCategory.FILE_STORAGE, 
@@ -555,7 +446,6 @@ def upload_violation_photos(files: List[Readable], prescription_id: int, prescri
                 f"Ошибка загрузки файла {i+1} для нарушения {prescription_id}. Результат: {result}"
             )
     
-    # Логируем итоговый результат
     if uploaded_urls:
         folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
         if prescription_title and user_name and user_role:

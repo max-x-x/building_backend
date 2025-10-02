@@ -26,9 +26,6 @@ class LogCategory(models.TextChoices):
 
 
 class Log(TimeStampedMixin):
-    """
-    Модель для хранения логов системы.
-    """
     level = models.CharField("Уровень", max_length=10, choices=LogLevel.choices, default=LogLevel.INFO)
     category = models.CharField("Категория", max_length=20, choices=LogCategory.choices, default=LogCategory.SYSTEM)
     message = models.TextField("Подробное сообщение")
@@ -48,7 +45,6 @@ class Log(TimeStampedMixin):
     
     @classmethod
     def create_log(cls, level, category, message):
-        """Создает новый лог с переданными параметрами."""
         return cls.objects.create(
             level=level,
             category=category,

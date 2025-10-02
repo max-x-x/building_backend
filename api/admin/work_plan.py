@@ -35,7 +35,6 @@ class WorkPlanAdmin(admin.ModelAdmin):
     )
 
     def work_items_count(self, obj):
-        """Количество работ в графике."""
         count = obj.items.count()
         return format_html('<span style="background-color: #007bff; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">{}</span>', count)
     work_items_count.short_description = "Работ"
@@ -75,13 +74,12 @@ class WorkItemAdmin(admin.ModelAdmin):
     )
 
     def status_from_schedule(self, obj):
-        """Статус из связанного элемента графика."""
         try:
             schedule_item = obj.schedule_item
             colors = {
-                "planned": "#6c757d",      # серый
-                "in_progress": "#ffc107",   # желтый
-                "done": "#28a745",          # зеленый
+                "planned": "#6c757d",
+                "in_progress": "#ffc107",
+                "done": "#28a745",
             }
             color = colors.get(schedule_item.status, "#6c757d")
             return format_html(
@@ -122,11 +120,10 @@ class ScheduleItemAdmin(admin.ModelAdmin):
     )
 
     def status_badge(self, obj):
-        """Отображает статус с цветным бейджем."""
         colors = {
-            "planned": "#6c757d",      # серый
-            "in_progress": "#ffc107",   # желтый
-            "done": "#28a745",          # зеленый
+            "planned": "#6c757d",
+            "in_progress": "#ffc107",
+            "done": "#28a745",
         }
         color = colors.get(obj.status, "#6c757d")
         return format_html(

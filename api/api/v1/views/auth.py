@@ -39,14 +39,12 @@ class AuthLoginView(APIView):
             return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
         if not user.check_password(password):
-            # Логируем неудачную попытку входа
             log_user_login(email, "Неизвестная роль", False)
             return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
         access = create_access_token(user)
         refresh, _rt = create_refresh_token(user, user_agent=request.headers.get("User-Agent", ""), ip=_client_ip(request))
         
-        # Логируем успешный вход
         log_user_login(user.full_name, user.role, True)
         
         out = LoginOutSerializer({"access": access, "refresh": refresh, "user": user})
@@ -99,7 +97,6 @@ class AuthInviteView(APIView):
             user.save(update_fields=["role"])
 
         inv = Invitation.objects.create(email=email, role=role, invited_by=request.user)
-        # TODO: отправка письма со ссылкой на регистрацию/сброс пароля и inv.token
         out = InviteOutSerializer({"id": user.id, "email": user.email, "role": user.role})
         return Response(out.data, status=201)
 
@@ -118,7 +115,6 @@ class AuthLogoutView(APIView):
             rt.revoked = True
             rt.save(update_fields=["revoked"])
             
-            # Логируем выход пользователя
             log_user_logout(request.user.full_name, request.user.role)
             
         except RefreshToken.DoesNotExist:
@@ -137,7 +133,6 @@ class AuthRegisterByInviteView(APIView):
             return Response({"detail": "User already exists"}, status=400)
         except User.DoesNotExist:
             user = User.objects.create(email=ser.validated_data["email"].lower())
-        # Обновляем ФИО/телефон и пароль
         user.full_name = ser.validated_data["full_name"]
         user.role = ser.validated_data["role"]
         user.phone = ser.validated_data.get("phone", "")

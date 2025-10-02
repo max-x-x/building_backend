@@ -33,7 +33,6 @@ class DailyChecklistsView(APIView):
             status="submitted",
         )
         
-        # Отправляем уведомления ИКО и ССК о заполненном чек-листе
         try:
             from api.api.v1.views.utils import send_notification
             if obj.iko_id and obj.iko:

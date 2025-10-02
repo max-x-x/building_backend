@@ -3,14 +3,12 @@ from api.models.area import Area
 
 
 class AreaCreateSerializer(serializers.ModelSerializer):
-    """Сериализатор для создания области."""
     
     class Meta:
         model = Area
         fields = ("name", "geometry", "object")
     
     def validate_geometry(self, value):
-        """Валидация GeoJSON geometry."""
         if not isinstance(value, dict):
             raise serializers.ValidationError("Geometry должен быть объектом")
         
@@ -22,7 +20,6 @@ class AreaCreateSerializer(serializers.ModelSerializer):
         if not coordinates or not isinstance(coordinates, list):
             raise serializers.ValidationError("Отсутствуют или некорректны coordinates")
         
-        # Базовая валидация структуры координат
         if geom_type == "Polygon":
             if not isinstance(coordinates, list) or len(coordinates) == 0:
                 raise serializers.ValidationError("Polygon должен содержать массив колец")
@@ -44,8 +41,6 @@ class AreaCreateSerializer(serializers.ModelSerializer):
 
 
 class AreaOutSerializer(serializers.ModelSerializer):
-    """Сериализатор для вывода области."""
-    
     geometry_type = serializers.SerializerMethodField()
     
     class Meta:
@@ -57,6 +52,5 @@ class AreaOutSerializer(serializers.ModelSerializer):
 
 
 class AreaListOutSerializer(serializers.Serializer):
-    """Сериализатор для списка областей."""
     items = AreaOutSerializer(many=True)
     total = serializers.IntegerField()

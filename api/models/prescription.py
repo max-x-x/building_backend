@@ -7,9 +7,6 @@ from api.models.object import ConstructionObject
 
 
 class Prescription(TimeStampedMixin):
-    """
-    Предписание по результатам проверки (ИКО или ССК).
-    """
     STATUS = (
         ("open", "Открыто"),
         ("awaiting_verification", "Ожидает проверки"),
@@ -27,7 +24,6 @@ class Prescription(TimeStampedMixin):
     status = models.CharField("Статус", max_length=32, choices=STATUS, default="open")
     closed_at = models.DateTimeField("Закрыто", null=True, blank=True)
     
-    # Ссылки на файловое хранилище
     violation_photos_folder_url = models.JSONField("URL папки с фото нарушения", default=list, blank=True, help_text="Массив ссылок на фото нарушения в файловом хранилище")
 
     class Meta:
@@ -40,16 +36,12 @@ class Prescription(TimeStampedMixin):
 
 
 class PrescriptionFix(TimeStampedMixin):
-    """
-    Сообщение об исправлении от прораба.
-    """
     uuid_fix = models.UUIDField("UUID исправления", default=uuid.uuid4, editable=False)
     prescription = models.ForeignKey(Prescription, verbose_name="Предписание", on_delete=models.CASCADE, related_name="fixes")
     author = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Кто исправил (Прораб)", on_delete=models.PROTECT)
     comment = models.TextField("Комментарий")
     attachments = models.JSONField("Вложения (URL'ы)", default=list, blank=True)
     
-    # Ссылки на файловое хранилище
     fix_photos_folder_url = models.JSONField("URL папки с фото исправления", default=list, blank=True, help_text="Массив ссылок на фото исправления нарушения в файловом хранилище")
 
     class Meta:

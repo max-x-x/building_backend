@@ -38,11 +38,10 @@ class DailyChecklistAdmin(admin.ModelAdmin):
     )
 
     def status_badge(self, obj):
-        """Отображает статус чек-листа с цветным бейджем."""
         colors = {
-            "submitted": "#ffc107",    # желтый
-            "approved": "#28a745",     # зеленый
-            "rejected": "#dc3545",     # красный
+            "submitted": "#ffc107",
+            "approved": "#28a745",
+            "rejected": "#dc3545",
         }
         color = colors.get(obj.status, "#6c757d")
         return format_html(

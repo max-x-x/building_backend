@@ -12,9 +12,6 @@ from api.api.v1.views.utils import send_notification
 
 
 def _visible_object_ids_for_user(user):
-    """
-    Возвращает queryset id объектов, доступных пользователю по роли.
-    """
     if user.role == Roles.ADMIN:
         return ConstructionObject.objects.values_list("id", flat=True)
 
@@ -24,7 +21,6 @@ def _visible_object_ids_for_user(user):
     if user.role == Roles.IKO:
         return ConstructionObject.objects.filter(iko=user).values_list("id", flat=True)
 
-    # foreman
     return ConstructionObject.objects.filter(foreman=user).values_list("id", flat=True)
 
 def _paginated(qs, request, default_limit=20, max_limit=200):
@@ -48,13 +44,10 @@ class ObjectsListCreateView(APIView):
 
         qs = ConstructionObject.objects.select_related("ssk", "foreman", "iko").prefetch_related("areas").all()
 
-        # видимость по роли
-        # SSK теперь видит все объекты; фильтрация по своим — через mine=true
         if request.user.role == Roles.IKO:
             qs = qs.filter(iko=request.user)
         elif request.user.role == Roles.FOREMAN:
             qs = qs.filter(foreman=request.user)
-        # admin видит всё
 
         if status_param:
             qs = qs.filter(status=status_param)
@@ -62,7 +55,7 @@ class ObjectsListCreateView(APIView):
             qs = qs.filter(Q(name__icontains=query) | Q(address__icontains=query))
         if mine in {"1", "true", "True"}:
             if request.user.role == Roles.ADMIN:
-                qs = qs.filter(created_by=request.user)  # для админа "мои" = я создал
+                qs = qs.filter(created_by=request.user)
             elif request.user.role == Roles.SSK:
                 qs = qs.filter(ssk=request.user)
             elif request.user.role == Roles.IKO:
@@ -80,17 +73,12 @@ class ObjectsListCreateView(APIView):
         ser.is_valid(raise_exception=True)
         obj = ser.save()
         
-        # Логируем создание объекта
         log_object_created(obj.name, obj.address, request.user.full_name, request.user.role)
         
         return Response(ObjectOutSerializer(obj).data, status=status.HTTP_201_CREATED)
 
 
 class ObjectsDetailView(APIView):
-    """
-    GET /objects/{id}
-    PATCH /objects/{id}
-    """
     def get(self, request, id: int):
         try:
             obj = ConstructionObject.objects.select_related("ssk", "foreman", "iko").prefetch_related("areas").get(id=id)
@@ -106,7 +94,6 @@ class ObjectsDetailView(APIView):
         if not allowed:
             return Response({"detail": "Forbidden"}, status=403)
 
-        # Логируем просмотр объекта
         log_object_viewed(obj.name, request.user.full_name, request.user.role)
 
         return Response(ObjectOutSerializer(obj).data, status=200)
@@ -122,10 +109,8 @@ class ObjectsDetailView(APIView):
         before_ssk = obj.ssk_id
         obj = ser.save()
         
-        # Логируем изменение объекта
         log_object_updated(obj.name, request.user.full_name, request.user.role, str(request.data))
         
-        # если привязали ССК впервые — статус в ожидание активации
         if not before_ssk and obj.ssk_id and obj.status == ObjectStatus.DRAFT:
             old_status = "Черновик"
             new_status = "Ожидает активации"
@@ -189,10 +174,8 @@ class ObjectCompleteBySSKView(APIView):
         obj.can_proceed = False
         obj.save(update_fields=["status", "can_proceed", "modified_at"])
         
-        # Логируем изменение статуса
         log_object_status_changed(obj.name, "Завершён ССК", request.user.full_name, request.user.role)
         
-        # Отправляем уведомление ИКО
         try:
             if obj.iko_id and obj.iko:
                 send_notification(
@@ -219,7 +202,6 @@ class ObjectCompleteView(APIView):
         if request.user.role != Roles.IKO or obj.iko_id != request.user.id:
             return Response({"detail": "Only assigned IKO can complete"}, status=403)
         
-        # ИКО может завершить только если ССК уже завершил
         if obj.status != ObjectStatus.COMPLETED_BY_SSK:
             return Response({"detail": "Object must be completed by SSK first"}, status=400)
 
@@ -227,17 +209,12 @@ class ObjectCompleteView(APIView):
         obj.can_proceed = False
         obj.save(update_fields=["status", "can_proceed", "modified_at"])
         
-        # Логируем изменение статуса
         log_object_status_changed(obj.name, "Завершён", request.user.full_name, request.user.role)
         
         return Response({"status": obj.status}, status=200)
 
 
 class ObjectFullDetailView(APIView):
-    """
-    GET /api/v1/objects/{id}/full
-    Получение максимально подробной информации об объекте со всеми связанными данными.
-    """
     def get(self, request, id: int):
         try:
             obj = ConstructionObject.objects.select_related(
@@ -254,7 +231,6 @@ class ObjectFullDetailView(APIView):
         except ConstructionObject.DoesNotExist:
             return Response({"detail": "Not found"}, status=404)
 
-        # Проверяем права доступа
         allowed = (
             request.user.role == Roles.ADMIN or
             request.user.role == Roles.SSK or

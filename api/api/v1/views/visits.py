@@ -13,10 +13,6 @@ from api.models.notify import Notification
 
 
 class VisitRequestsView(APIView):
-    """
-    GET  /visit-requests        — список с фильтрами (mine, period, status, object)
-    POST /visit-requests        — создать заявку (ИКО/Admin)
-    """
     def get(self, request):
         object_ids = _visible_object_ids_for_user(request.user)
         qs = (VisitRequest.objects
@@ -34,7 +30,6 @@ class VisitRequestsView(APIView):
         if mine in {"1", "true", "True"}:
             qs = qs.filter(requested_by=request.user)
 
-        # период по planned_at
         from django.utils.dateparse import parse_datetime
         date_from = request.query_params.get("date_from")
         if date_from:
@@ -76,16 +71,10 @@ class VisitRequestsView(APIView):
             .select_related("object", "requested_by")
             .get(id=vr.id)
         )
-        # нотификации оставь как у тебя
         return Response(VisitRequestListSerializer(vr).data, status=201)
 
 
 class QrCreateView(APIView):
-    """
-    POST /api/v1/qr-codes
-    Кто: admin
-    Тело: { object, user, valid_from, valid_to, geojson, visit_request_id? }
-    """
     permission_classes = [RoleRequired.as_permitted(Roles.ADMIN)]
 
     @transaction.atomic
@@ -108,10 +97,6 @@ class QrCreateView(APIView):
 
 
 class VisitsDetailView(APIView):
-    """
-    GET /api/v1/visit-requests/<int:id>
-    Детали заявки на посещение (с проверкой доступа).
-    """
     def get(self, request, id: int):
         object_ids = _visible_object_ids_for_user(request.user)
         try:

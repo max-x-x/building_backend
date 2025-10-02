@@ -30,12 +30,11 @@ class WorkAdmin(admin.ModelAdmin):
     )
 
     def status_badge(self, obj):
-        """Отображает статус работы с цветным бейджем."""
         colors = {
-            "pending": "#6c757d",      # серый
-            "in_progress": "#ffc107",   # желтый
-            "completed": "#28a745",     # зеленый
-            "cancelled": "#dc3545",     # красный
+            "pending": "#6c757d",
+            "in_progress": "#ffc107",
+            "completed": "#28a745",
+            "cancelled": "#dc3545",
         }
         color = colors.get(obj.status, "#6c757d")
         return format_html(

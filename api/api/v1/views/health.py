@@ -7,7 +7,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
 
-# опционально: отметка старта процесса
 STARTED_AT = timezone.now()
 
 class PingView(APIView):
@@ -23,7 +22,6 @@ class PingView(APIView):
             "components": {},
         }
 
-        # 1) БД
         db_ok, db_err = True, None
         try:
             with connection.cursor() as cur:
@@ -33,7 +31,6 @@ class PingView(APIView):
             db_ok, db_err = False, str(e)
         result["components"]["database"] = {"ok": db_ok, "error": db_err}
 
-        # 2) Кэш (если настроен)
         cache_ok, cache_err = True, None
         try:
             key = f"health:{uuid.uuid4()}"
@@ -43,7 +40,6 @@ class PingView(APIView):
             cache_ok, cache_err = False, str(e)
         result["components"]["cache"] = {"ok": cache_ok, "error": cache_err}
 
-        # 3) Неприменённые миграции (лайтовая проверка; безопасно обёрнута)
         pending = None
         try:
             from django.db.migrations.executor import MigrationExecutor
@@ -51,17 +47,14 @@ class PingView(APIView):
             plan = executor.migration_plan(executor.loader.graph.leaf_nodes())
             pending = len(plan)
         except Exception:
-            # если миграционный модуль недоступен/ошибся — не валим пинг
             pending = None
         result["components"]["migrations"] = {"pending": pending}
 
-        # HTTP код: 200 если всё ок, 503 если что-то критично
         if not db_ok:
             result["status"] = "error"
             return Response(result, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         if not cache_ok:
             result["status"] = "degraded"
-            # деградировано, но живо
             return Response(result, status=status.HTTP_200_OK)
 
         return Response(result, status=status.HTTP_200_OK)

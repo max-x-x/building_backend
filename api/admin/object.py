@@ -35,14 +35,13 @@ class ConstructionObjectAdmin(admin.ModelAdmin):
     )
 
     def status_badge(self, obj):
-        """Отображает статус с цветным бейджем."""
         colors = {
-            ObjectStatus.DRAFT: "#6c757d",           # серый
-            ObjectStatus.ACTIVATION_PENDING: "#ffc107", # желтый
-            ObjectStatus.ACTIVE: "#28a745",          # зеленый
-            ObjectStatus.SUSPENDED: "#dc3545",       # красный
-            ObjectStatus.COMPLETED_BY_SSK: "#17a2b8", # голубой
-            ObjectStatus.COMPLETED: "#6f42c1",       # фиолетовый
+            ObjectStatus.DRAFT: "#6c757d",
+            ObjectStatus.ACTIVATION_PENDING: "#ffc107",
+            ObjectStatus.ACTIVE: "#28a745",
+            ObjectStatus.SUSPENDED: "#dc3545",
+            ObjectStatus.COMPLETED_BY_SSK: "#17a2b8",
+            ObjectStatus.COMPLETED: "#6f42c1",
         }
         color = colors.get(obj.status, "#6c757d")
         return format_html(
@@ -53,7 +52,6 @@ class ConstructionObjectAdmin(admin.ModelAdmin):
     status_badge.admin_order_field = "status"
 
     def can_proceed_badge(self, obj):
-        """Отображает статус продолжения работ."""
         if obj.can_proceed:
             return format_html('<span style="color: #28a745;">✅ Можно продолжать</span>')
         return format_html('<span style="color: #dc3545;">❌ Остановлено</span>')
@@ -98,11 +96,10 @@ class ObjectActivationAdmin(admin.ModelAdmin):
     )
 
     def status_badge(self, obj):
-        """Отображает статус активации с цветным бейджем."""
         colors = {
-            "pending": "#ffc107",    # желтый
-            "checked": "#dc3545",   # красный
-            "approved": "#28a745", # зеленый
+            "pending": "#ffc107",
+            "checked": "#dc3545",
+            "approved": "#28a745",
         }
         color = colors.get(obj.status, "#6c757d")
         return format_html(

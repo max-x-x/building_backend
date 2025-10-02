@@ -11,8 +11,8 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    add_form = UserCreationForm          # форма создания (с паролями)
-    form = UserChangeForm               # форма изменения (показывает хэш)
+    add_form = UserCreationForm
+    form = UserChangeForm
     model = User
 
     list_display = ("id", "email", "full_name", "role_badge", "phone", "is_active", "is_staff", "date_joined")
@@ -45,12 +45,11 @@ class UserAdmin(BaseUserAdmin):
     readonly_fields = ("date_joined", "last_login")
 
     def role_badge(self, obj):
-        """Отображает роль с цветным бейджем."""
         colors = {
-            Roles.ADMIN: "#dc3545",      # красный
-            Roles.SSK: "#007bff",        # синий  
-            Roles.IKO: "#28a745",       # зеленый
-            Roles.FOREMAN: "#ffc107",    # желтый
+            Roles.ADMIN: "#dc3545",
+            Roles.SSK: "#007bff",
+            Roles.IKO: "#28a745",
+            Roles.FOREMAN: "#ffc107",
         }
         color = colors.get(obj.role, "#6c757d")
         return format_html(
@@ -69,13 +68,11 @@ class RefreshTokenAdmin(admin.ModelAdmin):
     list_per_page = 25
 
     def jti_short(self, obj):
-        """Сокращенный JTI."""
         jti_str = str(obj.jti)
         return f"{jti_str[:8]}..."
     jti_short.short_description = "JTI"
 
     def revoked_badge(self, obj):
-        """Статус отзыва токена."""
         if obj.revoked:
             return format_html('<span style="color: #dc3545;">❌ Отозван</span>')
         return format_html('<span style="color: #28a745;">✅ Активен</span>')
@@ -91,7 +88,6 @@ class InvitationAdmin(admin.ModelAdmin):
     list_per_page = 25
 
     def role_badge(self, obj):
-        """Отображает роль с цветным бейджем."""
         colors = {
             Roles.ADMIN: "#dc3545",
             Roles.SSK: "#007bff", 
@@ -106,7 +102,6 @@ class InvitationAdmin(admin.ModelAdmin):
     role_badge.short_description = "Роль"
 
     def status_badge(self, obj):
-        """Статус приглашения."""
         if obj.accepted_at:
             return format_html('<span style="color: #28a745;">✅ Принято</span>')
         elif obj.expires_at and obj.expires_at < timezone.now():

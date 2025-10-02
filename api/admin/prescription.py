@@ -43,18 +43,16 @@ class PrescriptionAdmin(admin.ModelAdmin):
     )
 
     def title_short(self, obj):
-        """Сокращенное название нарушения."""
         if len(obj.title) > 50:
             return f"{obj.title[:50]}..."
         return obj.title
     title_short.short_description = "Нарушение"
 
     def status_badge(self, obj):
-        """Отображает статус с цветным бейджем."""
         colors = {
-            "open": "#dc3545",              # красный
-            "awaiting_verification": "#ffc107", # желтый
-            "closed": "#28a745",            # зеленый
+            "open": "#dc3545",
+            "awaiting_verification": "#ffc107",
+            "closed": "#28a745",
         }
         color = colors.get(obj.status, "#6c757d")
         return format_html(
@@ -65,7 +63,6 @@ class PrescriptionAdmin(admin.ModelAdmin):
     status_badge.admin_order_field = "status"
 
     def requires_stop_badge(self, obj):
-        """Требует остановки работ."""
         if obj.requires_stop:
             return format_html('<span style="color: #dc3545;">🛑 Да</span>')
         return format_html('<span style="color: #28a745;">✅ Нет</span>')
@@ -73,7 +70,6 @@ class PrescriptionAdmin(admin.ModelAdmin):
     requires_stop_badge.admin_order_field = "requires_stop"
 
     def requires_personal_recheck_badge(self, obj):
-        """Требует личной проверки."""
         if obj.requires_personal_recheck:
             return format_html('<span style="color: #ffc107;">👤 Да</span>')
         return format_html('<span style="color: #6c757d;">❌ Нет</span>')
@@ -114,7 +110,6 @@ class PrescriptionFixAdmin(admin.ModelAdmin):
     )
 
     def comment_short(self, obj):
-        """Сокращенный комментарий."""
         if len(obj.comment) > 100:
             return f"{obj.comment[:100]}..."
         return obj.comment

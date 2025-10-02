@@ -11,7 +11,6 @@ class WPVersionOutSerializer(serializers.ModelSerializer):
         fields = ("id","uuid_wp_version","version","doc_url","created_at")
 
 class WorkItemOutSerializer(serializers.ModelSerializer):
-    """Сериализатор для работы в графике."""
     status = serializers.SerializerMethodField()
     
     class Meta:
@@ -19,7 +18,6 @@ class WorkItemOutSerializer(serializers.ModelSerializer):
         fields = ("id", "uuid_wi", "name", "quantity", "unit", "start_date", "end_date", "document_url", "status")
     
     def get_status(self, obj):
-        """Получаем статус из связанного ScheduleItem."""
         try:
             schedule_item = obj.schedule_item
             return schedule_item.status

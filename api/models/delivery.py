@@ -21,7 +21,6 @@ class Delivery(TimeStampedMixin):
     status = models.CharField("Статус", max_length=20, choices=STATUS, default="scheduled")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Инициатор (ССК)", on_delete=models.PROTECT, related_name="deliveries_created")
     
-    # Ссылки на файловое хранилище
     invoice_photos_folder_url = models.JSONField("URL папки с фото накладных", default=list, blank=True, help_text="Массив ссылок на фото накладных в файловом хранилище")
 
     class Meta:
@@ -51,19 +50,14 @@ class Invoice(TimeStampedMixin):
 
 
 class Material(TimeStampedMixin):
-    """Материал из распознанной накладной."""
     uuid_material = models.UUIDField("UUID материала", default=uuid.uuid4, editable=False)
     delivery = models.ForeignKey(Delivery, verbose_name="Поставка", on_delete=models.CASCADE, related_name="materials")
     invoice = models.ForeignKey(Invoice, verbose_name="Накладная", on_delete=models.CASCADE, related_name="materials")
-    
-    # Поля из распознанных данных
     material_name = models.CharField("Наименование материала", max_length=255)
     material_quantity = models.CharField("Количество материала", max_length=100, blank=True)
     material_size = models.CharField("Размер", max_length=100, blank=True)
     material_volume = models.CharField("Объем", max_length=100, blank=True)
     material_netto = models.CharField("Нетто", max_length=100, blank=True)
-    
-    # Статус материала (для отслеживания изменений)
     is_confirmed = models.BooleanField("Подтвержден", default=False)
 
     class Meta:
@@ -80,7 +74,7 @@ class LabOrder(TimeStampedMixin):
 
     uuid_lab_order = models.UUIDField("UUID заказа в лабораторию", default=uuid.uuid4, editable=False)
     delivery = models.ForeignKey(Delivery, verbose_name="Поставка", on_delete=models.CASCADE, related_name="lab_orders")
-    items = models.JSONField("Отобранные образцы", default=list, blank=True)  # [{invoice_item_id, sample_code}]
+    items = models.JSONField("Отобранные образцы", default=list, blank=True)
     status = models.CharField("Статус", max_length=16, choices=STATUS, default="sent")
 
     class Meta:

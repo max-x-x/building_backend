@@ -24,7 +24,6 @@ class Folder(TimeStampedMixin):
     def __str__(self):
         return f"{self.name} (obj={self.object_id})"
 
-# TODO убрать
 class DocumentFile(TimeStampedMixin):
     uuid_document = models.UUIDField("UUID файла", default=uuid.uuid4, editable=False)
     object = models.ForeignKey(

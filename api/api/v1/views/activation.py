@@ -2,21 +2,15 @@ from django.utils import timezone
 from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
 
 from api.api.v1.views.utils import RoleRequired, send_notification
 from api.models.user import Roles
 from api.models.object import ConstructionObject, ObjectActivation, ObjectStatus
-# from api.models.notify import Notification  # disabled: notifications handled externally
 from api.serializers.activation import ActivationRequestInSerializer, ActivationOutSerializer, pick_iko
 from api.utils.logging import log_activation_requested, log_activation_approved, log_activation_rejected
 
 
 class ActivationRequestView(APIView):
-    """
-    POST /api/v1/objects/<int:id>/activation/request
-    Кто: ССК объекта или admin
-    """
     permission_classes = [RoleRequired.as_permitted(Roles.ADMIN, Roles.SSK)]
 
     @transaction.atomic
@@ -32,7 +26,6 @@ class ActivationRequestView(APIView):
         ser = ActivationRequestInSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
 
-        # автопривязка ИКО при необходимости
         if not obj.iko:
             iko = pick_iko()
             if not iko:
@@ -48,11 +41,9 @@ class ActivationRequestView(APIView):
             ssk_checklist_pdf=ser.validated_data.get("ssk_checklist_pdf", ""),
         )
 
-        # Логируем запрос активации
         iko_name = obj.iko.full_name if obj.iko else None
         log_activation_requested(obj.name, request.user.full_name, request.user.role, iko_name)
 
-        # уведомления внешнему сервису: ИКО — выберите дату посещения
         try:
             if obj.iko_id and obj.iko:
                 send_notification(obj.iko_id, obj.iko.email, "Запрос активации объекта", f"Объект '{obj.name}': выберите дату посещения для активации", request.user.full_name, request.user.role)
@@ -63,11 +54,6 @@ class ActivationRequestView(APIView):
 
 
 class ActivationIkoCheckView(APIView):
-    """
-    POST /api/v1/objects/<int:id>/activation/iko-check
-    Тело: { "iko_has_violations": bool, "iko_checklist"?, "iko_checklist_pdf"?, "rejected_reason"? }
-    Кто: ИКО объекта или admin
-    """
     permission_classes = [RoleRequired.as_permitted(Roles.IKO, Roles.ADMIN)]
 
     @transaction.atomic
@@ -99,10 +85,8 @@ class ActivationIkoCheckView(APIView):
             act.rejected_reason = rejected_reason
             act.save()
             
-            # Логируем отклонение активации
             log_activation_rejected(obj.name, request.user.full_name, request.user.role, rejected_reason)
             
-            # уведомления отключены, обрабатываются внешним сервисом
             return Response(ActivationOutSerializer(act).data, status=200)
         else:
             act.status = "approved"
@@ -113,10 +97,8 @@ class ActivationIkoCheckView(APIView):
             obj.can_proceed = True
             obj.save(update_fields=["status","can_proceed"])
             
-            # Логируем одобрение активации
             log_activation_approved(obj.name, request.user.full_name, request.user.role)
             
-            # уведомления внешнему сервису
             try:
                 subj = "Активация объекта одобрена"
                 msg = f"Объект '{obj.name}' активирован."
