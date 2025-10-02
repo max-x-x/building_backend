@@ -470,14 +470,8 @@ def upload_violation_photos(files: List[Readable], prescription_id: int, prescri
 
 
 def upload_fix_photos_base64(base64_files: List[str], prescription_id: int, foreman_id: int, prescription_title: str = None, user_name: str = None, user_role: str = None) -> Optional[List[str]]:
-    """
-    Загружает фото исправления нарушения в файловое хранилище из base64.
-    Использует upload_violation_correction для каждого файла.
-    Возвращает список URL всех загруженных файлов.
-    """
     from api.utils.logging import log_fix_photos_uploaded, log_fix_photos_upload_failed, log_message, LogLevel, LogCategory
     
-    # Логируем начало процесса
     log_message(
         LogLevel.INFO, 
         LogCategory.FILE_STORAGE, 
@@ -493,13 +487,10 @@ def upload_fix_photos_base64(base64_files: List[str], prescription_id: int, fore
             f"Загружаем файл {i+1}/{len(base64_files)} для исправления нарушения {prescription_id}"
         )
         
-        # Декодируем base64 в байты
         try:
             import base64
-            # Убираем префикс data:image/...;base64, если есть
             if ',' in base64_data:
                 base64_data = base64_data.split(',', 1)[1]
-            # Добавляем padding если необходимо
             missing_padding = len(base64_data) % 4
             if missing_padding:
                 base64_data += '=' * (4 - missing_padding)
@@ -507,7 +498,6 @@ def upload_fix_photos_base64(base64_files: List[str], prescription_id: int, fore
             result = file_storage_client.upload_violation_correction(prescription_id, foreman_id, [file_data])
             
             if result and result.get('files') and len(result['files']) > 0:
-                # Получаем URL из первого файла (может быть url или presigned_url)
                 file_info = result['files'][0]
                 file_url = file_info.get('url') or file_info.get('presigned_url')
                 if file_url:
@@ -536,7 +526,6 @@ def upload_fix_photos_base64(base64_files: List[str], prescription_id: int, fore
                 f"Ошибка декодирования base64 файла {i+1} для исправления нарушения {prescription_id}: {str(e)}"
             )
     
-    # Логируем итоговый результат
     if uploaded_urls:
         if prescription_title and user_name and user_role:
             log_fix_photos_uploaded(prescription_title, prescription_id, f"{len(uploaded_urls)} файлов", user_name, user_role, len(base64_files))
@@ -560,10 +549,6 @@ def upload_fix_photos_base64(base64_files: List[str], prescription_id: int, fore
 
 
 def upload_fix_photos(files: List[Readable], prescription_id: int, foreman_id: int, prescription_title: str = None, user_name: str = None, user_role: str = None) -> Optional[str]:
-    """
-    Загружает фото исправления нарушения в файловое хранилище.
-    Использует upload_violation_correction для каждого файла.
-    """
     from api.utils.logging import log_fix_photos_uploaded, log_fix_photos_upload_failed
     
     uploaded_urls = []
@@ -573,7 +558,6 @@ def upload_fix_photos(files: List[Readable], prescription_id: int, foreman_id: i
         if result and result.get('url'):
             uploaded_urls.append(result['url'])
     
-    # Логируем результат
     if uploaded_urls:
         folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
         if prescription_title and user_name and user_role:
@@ -586,14 +570,8 @@ def upload_fix_photos(files: List[Readable], prescription_id: int, foreman_id: i
 
 
 def upload_invoice_photos_base64(base64_files: List[str], object_id: int, delivery_id: int, user_name: str = None, user_role: str = None) -> Optional[List[str]]:
-    """
-    Загружает фото накладных в файловое хранилище из base64.
-    Использует upload_delivery_photos для каждого файла.
-    Возвращает список URL всех загруженных файлов.
-    """
     from api.utils.logging import log_invoice_photos_uploaded, log_invoice_photos_upload_failed, log_message, LogLevel, LogCategory
     
-    # Логируем начало процесса
     log_message(
         LogLevel.INFO, 
         LogCategory.FILE_STORAGE, 
@@ -609,13 +587,10 @@ def upload_invoice_photos_base64(base64_files: List[str], object_id: int, delive
             f"Загружаем файл {i+1}/{len(base64_files)} для поставки {delivery_id}"
         )
         
-        # Декодируем base64 в байты
         try:
             import base64
-            # Убираем префикс data:image/...;base64, если есть
             if ',' in base64_data:
                 base64_data = base64_data.split(',', 1)[1]
-            # Добавляем padding если необходимо
             missing_padding = len(base64_data) % 4
             if missing_padding:
                 base64_data += '=' * (4 - missing_padding)
@@ -623,7 +598,6 @@ def upload_invoice_photos_base64(base64_files: List[str], object_id: int, delive
             result = file_storage_client.upload_delivery_photos(object_id, delivery_id, [file_data])
             
             if result and result.get('files') and len(result['files']) > 0:
-                # Получаем URL из первого файла (может быть url или presigned_url)
                 file_info = result['files'][0]
                 file_url = file_info.get('url') or file_info.get('presigned_url')
                 if file_url:
@@ -652,7 +626,6 @@ def upload_invoice_photos_base64(base64_files: List[str], object_id: int, delive
                 f"Ошибка декодирования base64 файла {i+1} для поставки {delivery_id}: {str(e)}"
             )
     
-    # Логируем итоговый результат
     if uploaded_urls:
         if user_name and user_role:
             log_invoice_photos_uploaded(f"Поставка {delivery_id}", delivery_id, f"{len(uploaded_urls)} файлов", user_name, user_role, len(base64_files))
@@ -676,10 +649,6 @@ def upload_invoice_photos_base64(base64_files: List[str], object_id: int, delive
 
 
 def upload_invoice_photos(files: List[Readable], object_id: int, delivery_id: int, user_name: str = None, user_role: str = None) -> Optional[str]:
-    """
-    Загружает фото накладных в файловое хранилище.
-    Использует upload_delivery_photos для каждого файла.
-    """
     from api.utils.logging import log_invoice_photos_uploaded, log_invoice_photos_upload_failed
     
     uploaded_urls = []
@@ -689,7 +658,6 @@ def upload_invoice_photos(files: List[Readable], object_id: int, delivery_id: in
         if result and result.get('url'):
             uploaded_urls.append(result['url'])
     
-    # Логируем результат
     if uploaded_urls:
         folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
         if user_name and user_role:
@@ -702,10 +670,6 @@ def upload_invoice_photos(files: List[Readable], object_id: int, delivery_id: in
 
 
 def upload_foreman_visit_photos(files: List[Readable], foreman_id: int, user_name: str = None, user_role: str = None) -> Optional[str]:
-    """
-    Загружает фото визита прораба в файловое хранилище.
-    Использует upload_foreman_visit для каждого файла.
-    """
     from api.utils.logging import log_file_upload_success, log_file_upload_failed
     
     uploaded_urls = []
@@ -715,7 +679,6 @@ def upload_foreman_visit_photos(files: List[Readable], foreman_id: int, user_nam
         if result and result.get('url'):
             uploaded_urls.append(result['url'])
     
-    # Логируем результат
     if uploaded_urls:
         folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
         if user_name and user_role:

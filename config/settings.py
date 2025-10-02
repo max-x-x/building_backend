@@ -18,7 +18,6 @@ ALLOWED_HOSTS = (os.environ.get('ALLOWED_HOSTS') or '').split(',')
 
 CSRF_TRUSTED_ORIGINS = (os.environ.get('CSRF_TRUSTED_ORIGINS') or '').split(',')
 
-# Загружаем настройки из модулей
 include(
     'components/application.py',
     'components/middleware.py',
@@ -49,7 +48,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 NOTIFY_SERVICE_URL = os.getenv("NOTIFY_SERVICE_URL", "")
 FILE_STORAGE_URL = os.getenv("FILE_STORAGE_URL", "https://building-s3-api.itc-hub.ru")
 
-# Настройки логирования
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
