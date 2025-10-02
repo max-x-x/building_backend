@@ -28,7 +28,6 @@ class DailyChecklistsView(APIView):
             object=obj,
             author=request.user,
             data=ser.validated_data["data"],
-            pdf_url=ser.validated_data["pdf_url"],
             photos_folder_url=ser.validated_data.get("photos_folder_url",""),
             status="submitted",
         )

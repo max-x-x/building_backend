@@ -12,7 +12,6 @@ class DailyChecklist(TimeStampedMixin):
     object = models.ForeignKey(ConstructionObject, verbose_name="Объект", on_delete=models.CASCADE, related_name="daily_checklists")
     author = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Автор (прораб)", on_delete=models.PROTECT, related_name="daily_reports")
     data = models.JSONField("Данные чек-листа", default=dict, blank=True)
-    pdf_url = models.URLField("URL PDF")
     photos_folder_url = models.URLField("URL папки с фото", max_length=10000, blank=True)
     status = models.CharField("Статус", max_length=16, choices=STATUS, default="submitted")
     reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Проверил (ССК)", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")

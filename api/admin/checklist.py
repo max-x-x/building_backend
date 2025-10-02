@@ -24,7 +24,7 @@ class DailyChecklistAdmin(admin.ModelAdmin):
             "classes": ("wide",)
         }),
         ("📄 Документы", {
-            "fields": ("pdf_url", "photos_folder_url"),
+            "fields": ("photos_folder_url",),
             "classes": ("collapse",)
         }),
         ("👤 Проверка", {
