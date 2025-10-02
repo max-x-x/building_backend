@@ -381,27 +381,64 @@ def upload_violation_photos(files: List[Readable], prescription_id: int, prescri
     Загружает фото нарушения в файловое хранилище.
     Использует upload_violation_creation для каждого файла.
     """
-    from api.utils.logging import log_violation_photos_uploaded, log_violation_photos_upload_failed
+    from api.utils.logging import log_violation_photos_uploaded, log_violation_photos_upload_failed, log_message, LogLevel, LogCategory
     
     # Определяем тег по роли пользователя
     tag = "ССК" if user_role == "ssk" else "ИКО" if user_role == "iko" else "ССК"
     
+    # Логируем начало процесса
+    log_message(
+        LogLevel.INFO, 
+        LogCategory.FILE_STORAGE, 
+        f"Начинаем загрузку фото нарушения. Тег: {tag}, prescription_id: {prescription_id}, файлов: {len(files)}. URL хранилища: {file_storage_client.base_url}"
+    )
+    
     uploaded_urls = []
     
-    for file in files:
+    for i, file in enumerate(files):
+        log_message(
+            LogLevel.INFO, 
+            LogCategory.FILE_STORAGE, 
+            f"Загружаем файл {i+1}/{len(files)} для нарушения {prescription_id}"
+        )
+        
         result = file_storage_client.upload_violation_creation(tag, prescription_id, [file])
+        
         if result and result.get('url'):
             uploaded_urls.append(result['url'])
+            log_message(
+                LogLevel.INFO, 
+                LogCategory.FILE_STORAGE, 
+                f"Файл {i+1} успешно загружен для нарушения {prescription_id}. URL: {result['url']}"
+            )
+        else:
+            log_message(
+                LogLevel.ERROR, 
+                LogCategory.FILE_STORAGE, 
+                f"Ошибка загрузки файла {i+1} для нарушения {prescription_id}. Результат: {result}"
+            )
     
-    # Логируем результат
+    # Логируем итоговый результат
     if uploaded_urls:
         folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
         if prescription_title and user_name and user_role:
             log_violation_photos_uploaded(prescription_title, prescription_id, folder_url, user_name, user_role, len(files))
+        
+        log_message(
+            LogLevel.INFO, 
+            LogCategory.FILE_STORAGE, 
+            f"Загрузка фото нарушения {prescription_id} завершена успешно. Загружено: {len(uploaded_urls)}/{len(files)} файлов. Возвращаем: {folder_url}"
+        )
         return folder_url
     else:
         if prescription_title and user_name and user_role:
             log_violation_photos_upload_failed(prescription_title, prescription_id, "Не удалось загрузить файлы", user_name, user_role, len(files))
+        
+        log_message(
+            LogLevel.ERROR, 
+            LogCategory.FILE_STORAGE, 
+            f"Загрузка фото нарушения {prescription_id} завершилась неудачей. Ни один файл не был загружен из {len(files)} файлов."
+        )
         return None
 
 

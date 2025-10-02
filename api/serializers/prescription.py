@@ -24,11 +24,19 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
         # Загружаем фото в файловое хранилище
         if violation_photos:
             from api.utils.file_storage import upload_violation_photos
+            from api.utils.logging import log_message, LogLevel, LogCategory
             
             # Получаем информацию о пользователе из контекста
             request = self.context.get("request")
             user_name = request.user.full_name if request and request.user else "Система"
             user_role = request.user.role if request and request.user else "system"
+            
+            # Логируем начало загрузки
+            log_message(
+                LogLevel.INFO, 
+                LogCategory.FILE_STORAGE, 
+                f"Начинаем загрузку {len(violation_photos)} фото для нарушения '{prescription.title}' (ID: {prescription.id}). Пользователь: {user_name} (роль: {user_role})"
+            )
             
             # Загружаем фото и получаем URL папки
             folder_url = upload_violation_photos(
@@ -43,6 +51,20 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
                 # Сохраняем ссылку на папку с фото
                 prescription.violation_photos_folder_url = folder_url
                 prescription.save(update_fields=["violation_photos_folder_url"])
+                
+                # Логируем успешное сохранение
+                log_message(
+                    LogLevel.INFO, 
+                    LogCategory.FILE_STORAGE, 
+                    f"Ссылка на фото нарушения '{prescription.title}' (ID: {prescription.id}) успешно сохранена в БД: {folder_url}"
+                )
+            else:
+                # Логируем ошибку
+                log_message(
+                    LogLevel.ERROR, 
+                    LogCategory.FILE_STORAGE, 
+                    f"Не удалось получить URL для фото нарушения '{prescription.title}' (ID: {prescription.id}). Ссылка не сохранена в БД."
+                )
         
         return prescription
 
