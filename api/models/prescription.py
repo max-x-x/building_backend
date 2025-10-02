@@ -28,7 +28,7 @@ class Prescription(TimeStampedMixin):
     closed_at = models.DateTimeField("Закрыто", null=True, blank=True)
     
     # Ссылки на файловое хранилище
-    violation_photos_folder_url = models.URLField("URL папки с фото нарушения", max_length=10000, blank=True, help_text="Ссылка на папку с фото нарушения в файловом хранилище")
+    violation_photos_folder_url = models.JSONField("URL папки с фото нарушения", default=list, blank=True, help_text="Массив ссылок на фото нарушения в файловом хранилище")
 
     class Meta:
         verbose_name = "Предписание"

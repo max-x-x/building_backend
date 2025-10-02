@@ -420,10 +420,11 @@ def upload_object_documents(files: List[Readable], object_id: int, object_name: 
         return None
 
 
-def upload_violation_photos_base64(base64_files: List[str], prescription_id: int, prescription_title: str = None, user_name: str = None, user_role: str = None) -> Optional[str]:
+def upload_violation_photos_base64(base64_files: List[str], prescription_id: int, prescription_title: str = None, user_name: str = None, user_role: str = None) -> Optional[List[str]]:
     """
     Загружает фото нарушения в файловое хранилище из base64.
     Использует upload_violation_creation для каждого файла.
+    Возвращает список URL всех загруженных файлов.
     """
     from api.utils.logging import log_violation_photos_uploaded, log_violation_photos_upload_failed, log_message, LogLevel, LogCategory
     
@@ -491,16 +492,15 @@ def upload_violation_photos_base64(base64_files: List[str], prescription_id: int
     
     # Логируем итоговый результат
     if uploaded_urls:
-        folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
         if prescription_title and user_name and user_role:
-            log_violation_photos_uploaded(prescription_title, prescription_id, folder_url, user_name, user_role, len(base64_files))
+            log_violation_photos_uploaded(prescription_title, prescription_id, f"{len(uploaded_urls)} файлов", user_name, user_role, len(base64_files))
         
         log_message(
             LogLevel.INFO, 
             LogCategory.FILE_STORAGE, 
-            f"Загрузка фото нарушения {prescription_id} завершена успешно. Загружено: {len(uploaded_urls)}/{len(base64_files)} файлов. Возвращаем: {folder_url}"
+            f"Загрузка фото нарушения {prescription_id} завершена успешно. Загружено: {len(uploaded_urls)}/{len(base64_files)} файлов. Возвращаем массив из {len(uploaded_urls)} URL"
         )
-        return folder_url
+        return uploaded_urls
     else:
         if prescription_title and user_name and user_role:
             log_violation_photos_upload_failed(prescription_title, prescription_id, "Не удалось загрузить файлы", user_name, user_role, len(base64_files))
