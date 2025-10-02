@@ -17,11 +17,11 @@ class UserBriefSerializer(serializers.ModelSerializer):
         fields = ("id", "email", "full_name", "role")
 
 class ObjectCreateSerializer(serializers.ModelSerializer):
-    # файлы документов объекта (принимаются с фронта)
+    # файлы документов объекта в формате base64 (принимаются с фронта)
     document_files = serializers.ListField(
-        child=serializers.FileField(), 
+        child=serializers.CharField(), 
         required=False, 
-        help_text="Список файлов документов объекта"
+        help_text="Список файлов документов объекта в формате base64"
     )
     
     class Meta:
@@ -39,10 +39,10 @@ class ObjectCreateSerializer(serializers.ModelSerializer):
         
         # Загружаем файлы в файловое хранилище
         if document_files:
-            from api.utils.file_storage import upload_object_documents
+            from api.utils.file_storage import upload_object_documents_base64
             
             # Загружаем файлы и получаем URL папки
-            folder_url = upload_object_documents(
+            folder_url = upload_object_documents_base64(
                 document_files, 
                 obj.id, 
                 obj.name, 
@@ -146,11 +146,11 @@ class ObjectPatchSerializer(serializers.Serializer):
     ssk_id = serializers.UUIDField(required=False, allow_null=True)
     primary_iko_id = serializers.UUIDField(required=False, allow_null=True)
     coordinates_id = serializers.IntegerField(required=False, allow_null=True)
-    # файлы документов объекта (принимаются с фронта)
+    # файлы документов объекта в формате base64 (принимаются с фронта)
     document_files = serializers.ListField(
-        child=serializers.FileField(), 
+        child=serializers.CharField(), 
         required=False, 
-        help_text="Список файлов документов объекта"
+        help_text="Список файлов документов объекта в формате base64"
     )
     can_continue_construction = serializers.BooleanField(required=False)
 
@@ -204,10 +204,10 @@ class ObjectPatchSerializer(serializers.Serializer):
         # документы
         document_files = self.validated_data.get("document_files", [])
         if document_files:
-            from api.utils.file_storage import upload_object_documents
+            from api.utils.file_storage import upload_object_documents_base64
             
             # Загружаем файлы и получаем URL папки
-            folder_url = upload_object_documents(
+            folder_url = upload_object_documents_base64(
                 document_files, 
                 obj.id, 
                 obj.name, 

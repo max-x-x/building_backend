@@ -51,10 +51,10 @@ class DeliveryReceiveView(APIView):
         # Обрабатываем фото накладных
         invoice_photos = ser.validated_data.get("invoice_photos", [])
         if invoice_photos:
-            from api.utils.file_storage import upload_invoice_photos
+            from api.utils.file_storage import upload_invoice_photos_base64
             
             # Загружаем фото и получаем URL папки
-            folder_url = upload_invoice_photos(invoice_photos, d.object_id, d.id, request.user.full_name, request.user.role)
+            folder_url = upload_invoice_photos_base64(invoice_photos, d.object_id, d.id, request.user.full_name, request.user.role)
             
             if folder_url:
                 # Сохраняем ссылку на папку с фото

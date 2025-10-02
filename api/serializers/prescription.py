@@ -4,11 +4,11 @@ from api.serializers.objects import ObjectShortSerializer
 
 
 class PrescriptionCreateSerializer(serializers.ModelSerializer):
-    # фото нарушения (принимаются с фронта)
+    # фото нарушения в формате base64 (принимаются с фронта)
     violation_photos = serializers.ListField(
-        child=serializers.FileField(), 
+        child=serializers.CharField(), 
         required=False, 
-        help_text="Список фото нарушения"
+        help_text="Список фото нарушения в формате base64"
     )
     
     class Meta:
@@ -23,7 +23,7 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
         
         # Загружаем фото в файловое хранилище
         if violation_photos:
-            from api.utils.file_storage import upload_violation_photos
+            from api.utils.file_storage import upload_violation_photos_base64
             from api.utils.logging import log_message, LogLevel, LogCategory
             
             # Получаем информацию о пользователе из контекста
@@ -39,7 +39,7 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
             )
             
             # Загружаем фото и получаем URL папки
-            folder_url = upload_violation_photos(
+            folder_url = upload_violation_photos_base64(
                 violation_photos, 
                 prescription.id, 
                 prescription.title, 
@@ -74,11 +74,11 @@ class PrescriptionOutSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 class PrescriptionFixCreateSerializer(serializers.ModelSerializer):
-    # фото исправления (принимаются с фронта)
+    # фото исправления в формате base64 (принимаются с фронта)
     fix_photos = serializers.ListField(
-        child=serializers.FileField(), 
+        child=serializers.CharField(), 
         required=False, 
-        help_text="Список фото исправления нарушения"
+        help_text="Список фото исправления нарушения в формате base64"
     )
     
     class Meta:
@@ -93,7 +93,7 @@ class PrescriptionFixCreateSerializer(serializers.ModelSerializer):
         
         # Загружаем фото в файловое хранилище
         if fix_photos:
-            from api.utils.file_storage import upload_fix_photos
+            from api.utils.file_storage import upload_fix_photos_base64
             
             # Получаем информацию о пользователе из контекста
             request = self.context.get("request")
@@ -101,7 +101,7 @@ class PrescriptionFixCreateSerializer(serializers.ModelSerializer):
             user_role = request.user.role if request and request.user else "system"
             
             # Загружаем фото и получаем URL папки
-            folder_url = upload_fix_photos(
+            folder_url = upload_fix_photos_base64(
                 fix_photos, 
                 prescription_fix.prescription.id, 
                 prescription_fix.prescription.object.foreman_id,  # Добавляем foreman_id

@@ -7,16 +7,16 @@ class DeliveryCreateSerializer(serializers.Serializer):
     object_id = serializers.IntegerField()
     planned_date = serializers.DateField(required=False)
     notes = serializers.CharField(required=False, allow_blank=True)
-    # фото накладных (принимаются с фронта)
+    # фото накладных в формате base64 (принимаются с фронта)
     invoice_photos = serializers.ListField(
-        child=serializers.FileField(), 
+        child=serializers.CharField(), 
         required=False, 
-        help_text="Список фото накладных"
+        help_text="Список фото накладных в формате base64"
     )
     
     def create(self, validated_data):
         from api.models.delivery import Delivery
-        from api.utils.file_storage import upload_invoice_photos
+        from api.utils.file_storage import upload_invoice_photos_base64
         
         invoice_photos = validated_data.pop("invoice_photos", [])
         
@@ -31,7 +31,7 @@ class DeliveryCreateSerializer(serializers.Serializer):
             user_role = request.user.role if request and request.user else "system"
             
             # Загружаем фото и получаем URL папки
-            folder_url = upload_invoice_photos(invoice_photos, delivery.object_id, delivery.id, user_name, user_role)
+            folder_url = upload_invoice_photos_base64(invoice_photos, delivery.object_id, delivery.id, user_name, user_role)
             
             if folder_url:
                 # Сохраняем ссылку на папку с фото
@@ -67,11 +67,11 @@ class DeliveryOutSerializer(serializers.ModelSerializer):
 class DeliveryReceiveSerializer(serializers.Serializer):
     object_id = serializers.IntegerField()
     notes = serializers.CharField(required=False, allow_blank=True)
-    # фото накладных (принимаются с фронта)
+    # фото накладных в формате base64 (принимаются с фронта)
     invoice_photos = serializers.ListField(
-        child=serializers.FileField(), 
+        child=serializers.CharField(), 
         required=False, 
-        help_text="Список фото накладных"
+        help_text="Список фото накладных в формате base64"
     )
 
 class InvoiceCreateSerializer(serializers.Serializer):

@@ -350,6 +350,39 @@ file_storage_client = FileStorageClient()
 
 # === ФУНКЦИИ-ОБЕРТКИ ДЛЯ ИНТЕГРАЦИИ С API ===
 
+def upload_object_documents_base64(base64_files: List[str], object_id: int, object_name: str = None, user_name: str = None, user_role: str = None) -> Optional[str]:
+    """
+    Загружает документы объекта в файловое хранилище из base64.
+    Использует upload_object_pdf для каждого файла.
+    """
+    from api.utils.logging import log_object_documents_uploaded, log_object_documents_upload_failed
+    
+    uploaded_urls = []
+    
+    for i, base64_data in enumerate(base64_files):
+        # Декодируем base64 в байты
+        try:
+            import base64
+            file_data = base64.b64decode(base64_data)
+            result = file_storage_client.upload_object_pdf(object_id, file_data)
+            if result and result.get('url'):
+                uploaded_urls.append(result['url'])
+        except Exception as e:
+            from api.utils.logging import log_message, LogLevel, LogCategory
+            log_message(LogLevel.ERROR, LogCategory.FILE_STORAGE, f"Ошибка декодирования base64 файла {i+1}: {str(e)}")
+    
+    # Логируем результат
+    if uploaded_urls:
+        folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
+        if object_name and user_name and user_role:
+            log_object_documents_uploaded(object_name, object_id, folder_url, user_name, user_role, len(base64_files))
+        return folder_url
+    else:
+        if object_name and user_name and user_role:
+            log_object_documents_upload_failed(object_name, object_id, "Не удалось загрузить файлы", user_name, user_role, len(base64_files))
+        return None
+
+
 def upload_object_documents(files: List[Readable], object_id: int, object_name: str = None, user_name: str = None, user_role: str = None) -> Optional[str]:
     """
     Загружает документы объекта в файловое хранилище.
@@ -373,6 +406,82 @@ def upload_object_documents(files: List[Readable], object_id: int, object_name: 
     else:
         if object_name and user_name and user_role:
             log_object_documents_upload_failed(object_name, object_id, "Не удалось загрузить файлы", user_name, user_role, len(files))
+        return None
+
+
+def upload_violation_photos_base64(base64_files: List[str], prescription_id: int, prescription_title: str = None, user_name: str = None, user_role: str = None) -> Optional[str]:
+    """
+    Загружает фото нарушения в файловое хранилище из base64.
+    Использует upload_violation_creation для каждого файла.
+    """
+    from api.utils.logging import log_violation_photos_uploaded, log_violation_photos_upload_failed, log_message, LogLevel, LogCategory
+    
+    # Определяем тег по роли пользователя
+    tag = "ССК" if user_role == "ssk" else "ИКО" if user_role == "iko" else "ССК"
+    
+    # Логируем начало процесса
+    log_message(
+        LogLevel.INFO, 
+        LogCategory.FILE_STORAGE, 
+        f"Начинаем загрузку фото нарушения из base64. Тег: {tag}, prescription_id: {prescription_id}, файлов: {len(base64_files)}. URL хранилища: {file_storage_client.base_url}"
+    )
+    
+    uploaded_urls = []
+    
+    for i, base64_data in enumerate(base64_files):
+        log_message(
+            LogLevel.INFO, 
+            LogCategory.FILE_STORAGE, 
+            f"Загружаем файл {i+1}/{len(base64_files)} для нарушения {prescription_id}"
+        )
+        
+        # Декодируем base64 в байты
+        try:
+            import base64
+            file_data = base64.b64decode(base64_data)
+            result = file_storage_client.upload_violation_creation(tag, prescription_id, [file_data])
+            
+            if result and result.get('url'):
+                uploaded_urls.append(result['url'])
+                log_message(
+                    LogLevel.INFO, 
+                    LogCategory.FILE_STORAGE, 
+                    f"Файл {i+1} успешно загружен для нарушения {prescription_id}. URL: {result['url']}"
+                )
+            else:
+                log_message(
+                    LogLevel.ERROR, 
+                    LogCategory.FILE_STORAGE, 
+                    f"Ошибка загрузки файла {i+1} для нарушения {prescription_id}. Результат: {result}"
+                )
+        except Exception as e:
+            log_message(
+                LogLevel.ERROR, 
+                LogCategory.FILE_STORAGE, 
+                f"Ошибка декодирования base64 файла {i+1} для нарушения {prescription_id}: {str(e)}"
+            )
+    
+    # Логируем итоговый результат
+    if uploaded_urls:
+        folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
+        if prescription_title and user_name and user_role:
+            log_violation_photos_uploaded(prescription_title, prescription_id, folder_url, user_name, user_role, len(base64_files))
+        
+        log_message(
+            LogLevel.INFO, 
+            LogCategory.FILE_STORAGE, 
+            f"Загрузка фото нарушения {prescription_id} завершена успешно. Загружено: {len(uploaded_urls)}/{len(base64_files)} файлов. Возвращаем: {folder_url}"
+        )
+        return folder_url
+    else:
+        if prescription_title and user_name and user_role:
+            log_violation_photos_upload_failed(prescription_title, prescription_id, "Не удалось загрузить файлы", user_name, user_role, len(base64_files))
+        
+        log_message(
+            LogLevel.ERROR, 
+            LogCategory.FILE_STORAGE, 
+            f"Загрузка фото нарушения {prescription_id} завершилась неудачей. Ни один файл не был загружен из {len(base64_files)} файлов."
+        )
         return None
 
 
@@ -442,6 +551,79 @@ def upload_violation_photos(files: List[Readable], prescription_id: int, prescri
         return None
 
 
+def upload_fix_photos_base64(base64_files: List[str], prescription_id: int, foreman_id: int, prescription_title: str = None, user_name: str = None, user_role: str = None) -> Optional[str]:
+    """
+    Загружает фото исправления нарушения в файловое хранилище из base64.
+    Использует upload_violation_correction для каждого файла.
+    """
+    from api.utils.logging import log_fix_photos_uploaded, log_fix_photos_upload_failed, log_message, LogLevel, LogCategory
+    
+    # Логируем начало процесса
+    log_message(
+        LogLevel.INFO, 
+        LogCategory.FILE_STORAGE, 
+        f"Начинаем загрузку фото исправления из base64. prescription_id: {prescription_id}, foreman_id: {foreman_id}, файлов: {len(base64_files)}. URL хранилища: {file_storage_client.base_url}"
+    )
+    
+    uploaded_urls = []
+    
+    for i, base64_data in enumerate(base64_files):
+        log_message(
+            LogLevel.INFO, 
+            LogCategory.FILE_STORAGE, 
+            f"Загружаем файл {i+1}/{len(base64_files)} для исправления нарушения {prescription_id}"
+        )
+        
+        # Декодируем base64 в байты
+        try:
+            import base64
+            file_data = base64.b64decode(base64_data)
+            result = file_storage_client.upload_violation_correction(prescription_id, foreman_id, [file_data])
+            
+            if result and result.get('url'):
+                uploaded_urls.append(result['url'])
+                log_message(
+                    LogLevel.INFO, 
+                    LogCategory.FILE_STORAGE, 
+                    f"Файл {i+1} успешно загружен для исправления нарушения {prescription_id}. URL: {result['url']}"
+                )
+            else:
+                log_message(
+                    LogLevel.ERROR, 
+                    LogCategory.FILE_STORAGE, 
+                    f"Ошибка загрузки файла {i+1} для исправления нарушения {prescription_id}. Результат: {result}"
+                )
+        except Exception as e:
+            log_message(
+                LogLevel.ERROR, 
+                LogCategory.FILE_STORAGE, 
+                f"Ошибка декодирования base64 файла {i+1} для исправления нарушения {prescription_id}: {str(e)}"
+            )
+    
+    # Логируем итоговый результат
+    if uploaded_urls:
+        folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
+        if prescription_title and user_name and user_role:
+            log_fix_photos_uploaded(prescription_title, prescription_id, folder_url, user_name, user_role, len(base64_files))
+        
+        log_message(
+            LogLevel.INFO, 
+            LogCategory.FILE_STORAGE, 
+            f"Загрузка фото исправления нарушения {prescription_id} завершена успешно. Загружено: {len(uploaded_urls)}/{len(base64_files)} файлов. Возвращаем: {folder_url}"
+        )
+        return folder_url
+    else:
+        if prescription_title and user_name and user_role:
+            log_fix_photos_upload_failed(prescription_title, prescription_id, "Не удалось загрузить файлы", user_name, user_role, len(base64_files))
+        
+        log_message(
+            LogLevel.ERROR, 
+            LogCategory.FILE_STORAGE, 
+            f"Загрузка фото исправления нарушения {prescription_id} завершилась неудачей. Ни один файл не был загружен из {len(base64_files)} файлов."
+        )
+        return None
+
+
 def upload_fix_photos(files: List[Readable], prescription_id: int, foreman_id: int, prescription_title: str = None, user_name: str = None, user_role: str = None) -> Optional[str]:
     """
     Загружает фото исправления нарушения в файловое хранилище.
@@ -465,6 +647,79 @@ def upload_fix_photos(files: List[Readable], prescription_id: int, foreman_id: i
     else:
         if prescription_title and user_name and user_role:
             log_fix_photos_upload_failed(prescription_title, prescription_id, "Не удалось загрузить файлы", user_name, user_role, len(files))
+        return None
+
+
+def upload_invoice_photos_base64(base64_files: List[str], object_id: int, delivery_id: int, user_name: str = None, user_role: str = None) -> Optional[str]:
+    """
+    Загружает фото накладных в файловое хранилище из base64.
+    Использует upload_delivery_photos для каждого файла.
+    """
+    from api.utils.logging import log_invoice_photos_uploaded, log_invoice_photos_upload_failed, log_message, LogLevel, LogCategory
+    
+    # Логируем начало процесса
+    log_message(
+        LogLevel.INFO, 
+        LogCategory.FILE_STORAGE, 
+        f"Начинаем загрузку фото накладных из base64. object_id: {object_id}, delivery_id: {delivery_id}, файлов: {len(base64_files)}. URL хранилища: {file_storage_client.base_url}"
+    )
+    
+    uploaded_urls = []
+    
+    for i, base64_data in enumerate(base64_files):
+        log_message(
+            LogLevel.INFO, 
+            LogCategory.FILE_STORAGE, 
+            f"Загружаем файл {i+1}/{len(base64_files)} для поставки {delivery_id}"
+        )
+        
+        # Декодируем base64 в байты
+        try:
+            import base64
+            file_data = base64.b64decode(base64_data)
+            result = file_storage_client.upload_delivery_photos(object_id, delivery_id, [file_data])
+            
+            if result and result.get('url'):
+                uploaded_urls.append(result['url'])
+                log_message(
+                    LogLevel.INFO, 
+                    LogCategory.FILE_STORAGE, 
+                    f"Файл {i+1} успешно загружен для поставки {delivery_id}. URL: {result['url']}"
+                )
+            else:
+                log_message(
+                    LogLevel.ERROR, 
+                    LogCategory.FILE_STORAGE, 
+                    f"Ошибка загрузки файла {i+1} для поставки {delivery_id}. Результат: {result}"
+                )
+        except Exception as e:
+            log_message(
+                LogLevel.ERROR, 
+                LogCategory.FILE_STORAGE, 
+                f"Ошибка декодирования base64 файла {i+1} для поставки {delivery_id}: {str(e)}"
+            )
+    
+    # Логируем итоговый результат
+    if uploaded_urls:
+        folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
+        if user_name and user_role:
+            log_invoice_photos_uploaded(f"Поставка {delivery_id}", delivery_id, folder_url, user_name, user_role, len(base64_files))
+        
+        log_message(
+            LogLevel.INFO, 
+            LogCategory.FILE_STORAGE, 
+            f"Загрузка фото накладных поставки {delivery_id} завершена успешно. Загружено: {len(uploaded_urls)}/{len(base64_files)} файлов. Возвращаем: {folder_url}"
+        )
+        return folder_url
+    else:
+        if user_name and user_role:
+            log_invoice_photos_upload_failed(f"Поставка {delivery_id}", delivery_id, "Не удалось загрузить файлы", user_name, user_role, len(base64_files))
+        
+        log_message(
+            LogLevel.ERROR, 
+            LogCategory.FILE_STORAGE, 
+            f"Загрузка фото накладных поставки {delivery_id} завершилась неудачей. Ни один файл не был загружен из {len(base64_files)} файлов."
+        )
         return None
 
 
