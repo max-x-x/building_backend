@@ -15,11 +15,12 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
         model = Prescription
         fields = ("object", "title", "description", "requires_stop", "requires_personal_recheck", "attachments", "violation_photos")
     
-    def create(self, validated_data):
-        violation_photos = validated_data.pop("violation_photos", [])
+    def save(self, **kwargs):
+        # Извлекаем violation_photos из validated_data, так как это поле не существует в модели
+        violation_photos = self.validated_data.pop("violation_photos", [])
         
-        # Создаем нарушение
-        prescription = super().create(validated_data)
+        # Создаем нарушение с дополнительными параметрами
+        prescription = super().save(**kwargs)
         
         # Загружаем фото в файловое хранилище
         if violation_photos:
@@ -85,11 +86,12 @@ class PrescriptionFixCreateSerializer(serializers.ModelSerializer):
         model = PrescriptionFix
         fields = ("comment", "attachments", "fix_photos")
     
-    def create(self, validated_data):
-        fix_photos = validated_data.pop("fix_photos", [])
+    def save(self, **kwargs):
+        # Извлекаем fix_photos из validated_data, так как это поле не существует в модели
+        fix_photos = self.validated_data.pop("fix_photos", [])
         
-        # Создаем исправление
-        prescription_fix = super().create(validated_data)
+        # Создаем исправление с дополнительными параметрами
+        prescription_fix = super().save(**kwargs)
         
         # Загружаем фото в файловое хранилище
         if fix_photos:

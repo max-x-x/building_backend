@@ -51,9 +51,9 @@ class PrescriptionsCollectionView(APIView):
                 from rest_framework.exceptions import PermissionDenied
                 raise PermissionDenied()
 
-        ser = PrescriptionCreateSerializer(data=request.data)
+        ser = PrescriptionCreateSerializer(data=request.data, context={'request': request})
         ser.is_valid(raise_exception=True)
-        pres = Prescription.objects.create(author=request.user, **ser.validated_data)
+        pres = ser.save(author=request.user)
 
         if pres.requires_stop:
             pres.object.can_proceed = False
@@ -98,9 +98,9 @@ class PrescriptionFixView(APIView):
             if not pres.object.foreman_id or pres.object.foreman_id != request.user.id:
                 return Response({"detail": "Only foreman of this object can fix"}, status=403)
 
-        ser = PrescriptionFixCreateSerializer(data=request.data)
+        ser = PrescriptionFixCreateSerializer(data=request.data, context={'request': request})
         ser.is_valid(raise_exception=True)
-        PrescriptionFix.objects.create(prescription=pres, author=request.user, **ser.validated_data)
+        prescription_fix = ser.save(prescription=pres, author=request.user)
 
         pres.status = "awaiting_verification"
         pres.save(update_fields=["status"])

@@ -14,7 +14,7 @@ class DeliveriesCreateView(APIView):
     def post(self, request):
         if request.user.role not in (Roles.SSK, Roles.ADMIN):
             return Response({"detail":"Forbidden"}, status=403)
-        ser = DeliveryCreateSerializer(data=request.data)
+        ser = DeliveryCreateSerializer(data=request.data, context={'request': request})
         ser.is_valid(raise_exception=True)
         try:
             obj = ConstructionObject.objects.get(id=ser.validated_data["object_id"])
@@ -22,13 +22,7 @@ class DeliveriesCreateView(APIView):
             return Response({"detail":"Object not found"}, status=404)
         if request.user.role != Roles.ADMIN and obj.ssk_id != request.user.id:
             return Response({"detail":"Forbidden"}, status=403)
-        d = Delivery.objects.create(
-            object=obj,
-            planned_date=ser.validated_data.get("planned_date"),
-            notes=ser.validated_data.get("notes",""),
-            invoice_photos_folder_url=ser.validated_data.get("invoice_photos_folder_url", ""),
-            created_by=request.user
-        )
+        d = ser.save(object=obj, created_by=request.user)
         
         # Логируем создание поставки
         log_delivery_created(obj.name, d.id, request.user.full_name, request.user.role)

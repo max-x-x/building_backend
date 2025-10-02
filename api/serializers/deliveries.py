@@ -14,14 +14,15 @@ class DeliveryCreateSerializer(serializers.Serializer):
         help_text="Список фото накладных в формате base64"
     )
     
-    def create(self, validated_data):
+    def save(self, **kwargs):
         from api.models.delivery import Delivery
         from api.utils.file_storage import upload_invoice_photos_base64
         
-        invoice_photos = validated_data.pop("invoice_photos", [])
+        # Извлекаем invoice_photos из validated_data, так как это поле не существует в модели
+        invoice_photos = self.validated_data.pop("invoice_photos", [])
         
-        # Создаем поставку
-        delivery = Delivery.objects.create(**validated_data)
+        # Создаем поставку с дополнительными параметрами
+        delivery = Delivery.objects.create(**self.validated_data, **kwargs)
         
         # Загружаем фото в файловое хранилище
         if invoice_photos:
