@@ -31,7 +31,7 @@ class DeliveryCreateSerializer(serializers.Serializer):
             user_role = request.user.role if request and request.user else "system"
             
             # Загружаем фото и получаем URL папки
-            folder_url = upload_invoice_photos(invoice_photos, delivery.id, user_name, user_role)
+            folder_url = upload_invoice_photos(invoice_photos, delivery.object_id, delivery.id, user_name, user_role)
             
             if folder_url:
                 # Сохраняем ссылку на папку с фото

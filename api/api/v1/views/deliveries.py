@@ -54,7 +54,7 @@ class DeliveryReceiveView(APIView):
             from api.utils.file_storage import upload_invoice_photos
             
             # Загружаем фото и получаем URL папки
-            folder_url = upload_invoice_photos(invoice_photos, d.id, request.user.full_name, request.user.role)
+            folder_url = upload_invoice_photos(invoice_photos, d.object_id, d.id, request.user.full_name, request.user.role)
             
             if folder_url:
                 # Сохраняем ссылку на папку с фото

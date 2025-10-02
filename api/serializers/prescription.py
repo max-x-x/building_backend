@@ -82,6 +82,7 @@ class PrescriptionFixCreateSerializer(serializers.ModelSerializer):
             folder_url = upload_fix_photos(
                 fix_photos, 
                 prescription_fix.prescription.id, 
+                prescription_fix.prescription.object.foreman_id,  # Добавляем foreman_id
                 prescription_fix.prescription.title, 
                 user_name, 
                 user_role

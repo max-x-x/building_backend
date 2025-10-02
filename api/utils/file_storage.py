@@ -1,6 +1,6 @@
 import base64
 import mimetypes
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, Tuple, Any
 from datetime import date as dt_date
 
 import requests
@@ -13,7 +13,7 @@ from api.utils.logging import (
 )
 
 
-Readable = Union[bytes, str, "io.BytesIO", "django.core.files.uploadedfile.InMemoryUploadedFile", "django.core.files.uploadedfile.TemporaryUploadedFile"]  # noqa: F821
+Readable = Union[bytes, str, Any]  # Любой файловый объект
 
 
 class FileStorageClient:
@@ -63,7 +63,7 @@ class FileStorageClient:
         return d.isoformat()
 
     @staticmethod
-    def _read_bytes(file: Readable) -> (bytes, Optional[str], Optional[str]):
+    def _read_bytes(file: Readable) -> Tuple[bytes, Optional[str], Optional[str]]:
         """
         Универсально читаем содержимое и пытаемся понять имя/контент-тайп.
         Возвращает (data, filename, content_type).
@@ -346,3 +346,138 @@ class FileStorageClient:
 
 # Глобальный экземпляр клиента
 file_storage_client = FileStorageClient()
+
+
+# === ФУНКЦИИ-ОБЕРТКИ ДЛЯ ИНТЕГРАЦИИ С API ===
+
+def upload_object_documents(files: List[Readable], object_id: int, object_name: str = None, user_name: str = None, user_role: str = None) -> Optional[str]:
+    """
+    Загружает документы объекта в файловое хранилище.
+    Использует upload_object_pdf для каждого файла.
+    """
+    from api.utils.logging import log_object_documents_uploaded, log_object_documents_upload_failed
+    
+    uploaded_urls = []
+    
+    for file in files:
+        result = file_storage_client.upload_object_pdf(object_id, file)
+        if result and result.get('url'):
+            uploaded_urls.append(result['url'])
+    
+    # Логируем результат
+    if uploaded_urls:
+        folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
+        if object_name and user_name and user_role:
+            log_object_documents_uploaded(object_name, object_id, folder_url, user_name, user_role, len(files))
+        return folder_url
+    else:
+        if object_name and user_name and user_role:
+            log_object_documents_upload_failed(object_name, object_id, "Не удалось загрузить файлы", user_name, user_role, len(files))
+        return None
+
+
+def upload_violation_photos(files: List[Readable], prescription_id: int, prescription_title: str = None, user_name: str = None, user_role: str = None) -> Optional[str]:
+    """
+    Загружает фото нарушения в файловое хранилище.
+    Использует upload_violation_creation для каждого файла.
+    """
+    from api.utils.logging import log_violation_photos_uploaded, log_violation_photos_upload_failed
+    
+    # Определяем тег по роли пользователя
+    tag = "ССК" if user_role == "ssk" else "ИКО" if user_role == "iko" else "ССК"
+    
+    uploaded_urls = []
+    
+    for file in files:
+        result = file_storage_client.upload_violation_creation(tag, prescription_id, [file])
+        if result and result.get('url'):
+            uploaded_urls.append(result['url'])
+    
+    # Логируем результат
+    if uploaded_urls:
+        folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
+        if prescription_title and user_name and user_role:
+            log_violation_photos_uploaded(prescription_title, prescription_id, folder_url, user_name, user_role, len(files))
+        return folder_url
+    else:
+        if prescription_title and user_name and user_role:
+            log_violation_photos_upload_failed(prescription_title, prescription_id, "Не удалось загрузить файлы", user_name, user_role, len(files))
+        return None
+
+
+def upload_fix_photos(files: List[Readable], prescription_id: int, foreman_id: int, prescription_title: str = None, user_name: str = None, user_role: str = None) -> Optional[str]:
+    """
+    Загружает фото исправления нарушения в файловое хранилище.
+    Использует upload_violation_correction для каждого файла.
+    """
+    from api.utils.logging import log_fix_photos_uploaded, log_fix_photos_upload_failed
+    
+    uploaded_urls = []
+    
+    for file in files:
+        result = file_storage_client.upload_violation_correction(prescription_id, foreman_id, [file])
+        if result and result.get('url'):
+            uploaded_urls.append(result['url'])
+    
+    # Логируем результат
+    if uploaded_urls:
+        folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
+        if prescription_title and user_name and user_role:
+            log_fix_photos_uploaded(prescription_title, prescription_id, folder_url, user_name, user_role, len(files))
+        return folder_url
+    else:
+        if prescription_title and user_name and user_role:
+            log_fix_photos_upload_failed(prescription_title, prescription_id, "Не удалось загрузить файлы", user_name, user_role, len(files))
+        return None
+
+
+def upload_invoice_photos(files: List[Readable], object_id: int, delivery_id: int, user_name: str = None, user_role: str = None) -> Optional[str]:
+    """
+    Загружает фото накладных в файловое хранилище.
+    Использует upload_delivery_photos для каждого файла.
+    """
+    from api.utils.logging import log_invoice_photos_uploaded, log_invoice_photos_upload_failed
+    
+    uploaded_urls = []
+    
+    for file in files:
+        result = file_storage_client.upload_delivery_photos(object_id, delivery_id, [file])
+        if result and result.get('url'):
+            uploaded_urls.append(result['url'])
+    
+    # Логируем результат
+    if uploaded_urls:
+        folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
+        if user_name and user_role:
+            log_invoice_photos_uploaded(delivery_id, folder_url, user_name, user_role, len(files))
+        return folder_url
+    else:
+        if user_name and user_role:
+            log_invoice_photos_upload_failed(delivery_id, "Не удалось загрузить файлы", user_name, user_role, len(files))
+        return None
+
+
+def upload_foreman_visit_photos(files: List[Readable], foreman_id: int, user_name: str = None, user_role: str = None) -> Optional[str]:
+    """
+    Загружает фото визита прораба в файловое хранилище.
+    Использует upload_foreman_visit для каждого файла.
+    """
+    from api.utils.logging import log_file_upload_success, log_file_upload_failed
+    
+    uploaded_urls = []
+    
+    for file in files:
+        result = file_storage_client.upload_foreman_visit(foreman_id, [file])
+        if result and result.get('url'):
+            uploaded_urls.append(result['url'])
+    
+    # Логируем результат
+    if uploaded_urls:
+        folder_url = uploaded_urls[0] if len(uploaded_urls) == 1 else f"{len(uploaded_urls)} файлов загружено"
+        if user_name and user_role:
+            log_file_upload_success("фото визита прораба", f"прораб #{foreman_id}", foreman_id, folder_url, user_name, user_role, len(files))
+        return folder_url
+    else:
+        if user_name and user_role:
+            log_file_upload_failed("фото визита прораба", f"прораб #{foreman_id}", foreman_id, "Не удалось загрузить файлы", user_name, user_role, len(files))
+        return None
