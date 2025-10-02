@@ -70,7 +70,7 @@ urlpatterns = [
     path("work-items/<int:id>/status", WorkItemSetStatusView.as_view(), name="work-item-set-status"),
 
     path("daily-checklists", DailyChecklistsView.as_view(), name="daily-checklists"),
-    path("daily-checklists/<uuid:id>/review", DailyChecklistReviewView.as_view(), name="daily-checklist-review"),
+    path("daily-checklists/<int:id>/review", DailyChecklistReviewView.as_view(), name="daily-checklist-review"),
 
     path("deliveries", DeliveriesCreateView.as_view(), name="deliveries-create"),
     path("deliveries/<int:id>", DeliveryDetailView.as_view(), name="delivery-detail"),

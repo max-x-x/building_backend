@@ -93,7 +93,7 @@ class DailyChecklistsView(APIView):
 class DailyChecklistReviewView(APIView):
     permission_classes = [RoleRequired.as_permitted(Roles.SSK, Roles.ADMIN)]
 
-    def post(self, request, id: str):
+    def post(self, request, id: int):
         try:
             dc = DailyChecklist.objects.select_related("object").get(id=id)
         except DailyChecklist.DoesNotExist:
