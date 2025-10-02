@@ -69,7 +69,15 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
         
         return prescription
 
+class PrescriptionFixSerializer(serializers.ModelSerializer):
+    """Сериализатор для исправления нарушения."""
+    class Meta:
+        model = PrescriptionFix
+        fields = ("id", "uuid_fix", "author", "comment", "attachments", "fix_photos_folder_url", "created_at")
+
 class PrescriptionOutSerializer(serializers.ModelSerializer):
+    fixes = PrescriptionFixSerializer(many=True, read_only=True)
+    
     class Meta:
         model = Prescription
         fields = "__all__"
@@ -121,6 +129,7 @@ class PrescriptionFixCreateSerializer(serializers.ModelSerializer):
 
 class PrescriptionListSerializer(serializers.ModelSerializer):
     object = ObjectShortSerializer(read_only=True)
+    fixes = PrescriptionFixSerializer(many=True, read_only=True)
 
     class Meta:
         model = Prescription
@@ -128,5 +137,5 @@ class PrescriptionListSerializer(serializers.ModelSerializer):
             "id", "uuid_prescription",
             "object", "author", "title",
             "requires_stop", "requires_personal_recheck", "description",
-            "status", "violation_photos_folder_url", "created_at", "closed_at",
+            "status", "violation_photos_folder_url", "fixes", "created_at", "closed_at",
         )

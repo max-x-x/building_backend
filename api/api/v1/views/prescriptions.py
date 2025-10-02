@@ -21,7 +21,7 @@ class PrescriptionsCollectionView(APIView):
     # GET: видят свои объекты. POST: ИКО/ССК/Admin
     def get(self, request):
         object_ids = _visible_object_ids_for_user(request.user)
-        qs = Prescription.objects.filter(object_id__in=object_ids).order_by("-created_at")
+        qs = Prescription.objects.filter(object_id__in=object_ids).prefetch_related('fixes').order_by("-created_at")
 
         # те же фильтры, что были:
         object_id = request.query_params.get("object_id")
@@ -212,7 +212,7 @@ class ViolationsListView(APIView):
     def get(self, request):
         object_ids = _visible_object_ids_for_user(request.user)
 
-        qs = Prescription.objects.filter(object_id__in=object_ids).order_by("-created_at")
+        qs = Prescription.objects.filter(object_id__in=object_ids).prefetch_related('fixes').order_by("-created_at")
 
         # фильтры
         object_id = request.query_params.get("object_id")
@@ -242,7 +242,7 @@ class PrescriptionsDetailView(APIView):
     def get(self, request, id: int):
         object_ids = _visible_object_ids_for_user(request.user)
         try:
-            pres = Prescription.objects.select_related("object").get(id=id, object_id__in=object_ids)
+            pres = Prescription.objects.select_related("object").prefetch_related('fixes').get(id=id, object_id__in=object_ids)
         except Prescription.DoesNotExist:
             return Response({"detail": "Not found"}, status=404)
         return Response(PrescriptionListSerializer(pres).data, status=200)
