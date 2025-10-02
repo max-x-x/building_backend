@@ -42,7 +42,7 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
             # Загружаем фото и получаем URL папки
             folder_url = upload_violation_photos_base64(
                 violation_photos, 
-                prescription.id, 
+                request.user.id,
                 prescription.title, 
                 user_name, 
                 user_role
