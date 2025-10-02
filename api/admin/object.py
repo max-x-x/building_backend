@@ -25,7 +25,7 @@ class ConstructionObjectAdmin(admin.ModelAdmin):
             "classes": ("wide",)
         }),
         ("📁 Документы", {
-            "fields": ("folder_url", "document_files", "documents_folder_url"),
+            "fields": ("documents_folder_url",),
             "classes": ("collapse",)
         }),
         ("📅 Системная информация", {

@@ -42,7 +42,7 @@ class UserAdmin(BaseUserAdmin):
             "fields": ("email", "full_name", "phone", "role", "password1", "password2", "is_staff", "is_superuser"),
         }),
     )
-    readonly_fields = ("date_joined", "last_login")
+    readonly_fields = ("id", "date_joined", "last_login")
 
     def role_badge(self, obj):
         colors = {
