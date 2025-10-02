@@ -372,8 +372,12 @@ def upload_object_documents_base64(base64_files: List[str], object_id: int, obje
                 base64_data += '=' * (4 - missing_padding)
             file_data = base64.b64decode(base64_data)
             result = file_storage_client.upload_object_pdf(object_id, file_data)
-            if result and result.get('url'):
-                uploaded_urls.append(result['url'])
+            if result and result.get('files') and len(result['files']) > 0:
+                # Получаем URL из первого файла (может быть url или presigned_url)
+                file_info = result['files'][0]
+                file_url = file_info.get('url') or file_info.get('presigned_url')
+                if file_url:
+                    uploaded_urls.append(file_url)
         except Exception as e:
             from api.utils.logging import log_message, LogLevel, LogCategory
             log_message(LogLevel.ERROR, LogCategory.FILE_STORAGE, f"Ошибка декодирования base64 файла {i+1}: {str(e)}")
@@ -455,13 +459,23 @@ def upload_violation_photos_base64(base64_files: List[str], prescription_id: int
             file_data = base64.b64decode(base64_data)
             result = file_storage_client.upload_violation_creation(tag, prescription_id, [file_data])
             
-            if result and result.get('url'):
-                uploaded_urls.append(result['url'])
-                log_message(
-                    LogLevel.INFO, 
-                    LogCategory.FILE_STORAGE, 
-                    f"Файл {i+1} успешно загружен для нарушения {prescription_id}. URL: {result['url']}"
-                )
+            if result and result.get('files') and len(result['files']) > 0:
+                # Получаем URL из первого файла (может быть url или presigned_url)
+                file_info = result['files'][0]
+                file_url = file_info.get('url') or file_info.get('presigned_url')
+                if file_url:
+                    uploaded_urls.append(file_url)
+                    log_message(
+                        LogLevel.INFO, 
+                        LogCategory.FILE_STORAGE, 
+                        f"Файл {i+1} успешно загружен для нарушения {prescription_id}. URL: {file_url}"
+                    )
+                else:
+                    log_message(
+                        LogLevel.ERROR, 
+                        LogCategory.FILE_STORAGE, 
+                        f"Файл {i+1} загружен для нарушения {prescription_id}, но URL не найден. Результат: {result}"
+                    )
             else:
                 log_message(
                     LogLevel.ERROR, 
@@ -601,13 +615,23 @@ def upload_fix_photos_base64(base64_files: List[str], prescription_id: int, fore
             file_data = base64.b64decode(base64_data)
             result = file_storage_client.upload_violation_correction(prescription_id, foreman_id, [file_data])
             
-            if result and result.get('url'):
-                uploaded_urls.append(result['url'])
-                log_message(
-                    LogLevel.INFO, 
-                    LogCategory.FILE_STORAGE, 
-                    f"Файл {i+1} успешно загружен для исправления нарушения {prescription_id}. URL: {result['url']}"
-                )
+            if result and result.get('files') and len(result['files']) > 0:
+                # Получаем URL из первого файла (может быть url или presigned_url)
+                file_info = result['files'][0]
+                file_url = file_info.get('url') or file_info.get('presigned_url')
+                if file_url:
+                    uploaded_urls.append(file_url)
+                    log_message(
+                        LogLevel.INFO, 
+                        LogCategory.FILE_STORAGE, 
+                        f"Файл {i+1} успешно загружен для исправления нарушения {prescription_id}. URL: {file_url}"
+                    )
+                else:
+                    log_message(
+                        LogLevel.ERROR, 
+                        LogCategory.FILE_STORAGE, 
+                        f"Файл {i+1} загружен для исправления нарушения {prescription_id}, но URL не найден. Результат: {result}"
+                    )
             else:
                 log_message(
                     LogLevel.ERROR, 
@@ -707,13 +731,23 @@ def upload_invoice_photos_base64(base64_files: List[str], object_id: int, delive
             file_data = base64.b64decode(base64_data)
             result = file_storage_client.upload_delivery_photos(object_id, delivery_id, [file_data])
             
-            if result and result.get('url'):
-                uploaded_urls.append(result['url'])
-                log_message(
-                    LogLevel.INFO, 
-                    LogCategory.FILE_STORAGE, 
-                    f"Файл {i+1} успешно загружен для поставки {delivery_id}. URL: {result['url']}"
-                )
+            if result and result.get('files') and len(result['files']) > 0:
+                # Получаем URL из первого файла (может быть url или presigned_url)
+                file_info = result['files'][0]
+                file_url = file_info.get('url') or file_info.get('presigned_url')
+                if file_url:
+                    uploaded_urls.append(file_url)
+                    log_message(
+                        LogLevel.INFO, 
+                        LogCategory.FILE_STORAGE, 
+                        f"Файл {i+1} успешно загружен для поставки {delivery_id}. URL: {file_url}"
+                    )
+                else:
+                    log_message(
+                        LogLevel.ERROR, 
+                        LogCategory.FILE_STORAGE, 
+                        f"Файл {i+1} загружен для поставки {delivery_id}, но URL не найден. Результат: {result}"
+                    )
             else:
                 log_message(
                     LogLevel.ERROR, 
