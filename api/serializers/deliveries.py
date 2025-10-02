@@ -59,11 +59,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
 class DeliveryOutSerializer(serializers.ModelSerializer):
     """Сериализатор для поставки с накладными и материалами."""
     invoices = InvoiceSerializer(many=True, read_only=True)
+    materials = MaterialSerializer(many=True, read_only=True)
     
     class Meta:
         model = Delivery
         fields = ("id", "uuid_delivery", "object", "planned_date", "notes", "status", 
-                "created_by", "invoices", "invoice_photos_folder_url", "created_at", "modified_at")
+                "created_by", "invoices", "materials", "invoice_photos_folder_url", "created_at", "modified_at")
 
 class DeliveryReceiveSerializer(serializers.Serializer):
     object_id = serializers.IntegerField()

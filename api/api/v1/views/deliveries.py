@@ -62,7 +62,7 @@ class DeliveryReceiveView(APIView):
 class DeliveriesListView(APIView):
     def get(self, request):
         visible = _visible_object_ids_for_user(request.user)
-        qs = Delivery.objects.filter(object_id__in=visible).order_by("-created_at")
+        qs = Delivery.objects.filter(object_id__in=visible).prefetch_related('invoices', 'materials').order_by("-created_at")
         object_id = request.query_params.get("object_id")
         if object_id:
             qs = qs.filter(object_id=object_id)
@@ -200,7 +200,7 @@ class DeliveryConfirmView(APIView):
     """
     def post(self, request, id: int):
         try:
-            delivery = Delivery.objects.get(id=id)
+            delivery = Delivery.objects.prefetch_related('invoices', 'materials').get(id=id)
         except Delivery.DoesNotExist:
             return Response({"detail": "Delivery not found"}, status=404)
         
