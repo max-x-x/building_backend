@@ -22,7 +22,7 @@ class Delivery(TimeStampedMixin):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Инициатор (ССК)", on_delete=models.PROTECT, related_name="deliveries_created")
     
     # Ссылки на файловое хранилище
-    invoice_photos_folder_url = models.URLField("URL папки с фото накладных", blank=True, help_text="Ссылка на папку с фото накладных в файловом хранилище")
+    invoice_photos_folder_url = models.URLField("URL папки с фото накладных", max_length=10000, blank=True, help_text="Ссылка на папку с фото накладных в файловом хранилище")
 
     class Meta:
         verbose_name = "Поставка"
@@ -38,7 +38,7 @@ class Invoice(TimeStampedMixin):
     object = models.ForeignKey(ConstructionObject, verbose_name="Объект", on_delete=models.CASCADE, related_name="invoices")
     delivery = models.ForeignKey(Delivery, verbose_name="Поставка", on_delete=models.CASCADE, related_name="invoices")
     pdf_url = models.URLField("URL PDF/фото накладной")
-    folder_url = models.URLField("URL папки на FTP", blank=True, help_text="Ссылка на папку с файлами на FTP сервере")
+    folder_url = models.URLField("URL папки на FTP", max_length=10000, blank=True, help_text="Ссылка на папку с файлами на FTP сервере")
     data = models.JSONField("Распознанные данные", default=dict, blank=True)
 
     class Meta:
