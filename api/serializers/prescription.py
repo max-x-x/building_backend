@@ -102,8 +102,8 @@ class PrescriptionFixCreateSerializer(serializers.ModelSerializer):
             user_name = request.user.full_name if request and request.user else "Система"
             user_role = request.user.role if request and request.user else "system"
             
-            # Загружаем фото и получаем URL папки
-            folder_url = upload_fix_photos_base64(
+            # Загружаем фото и получаем массив URL
+            urls = upload_fix_photos_base64(
                 fix_photos, 
                 prescription_fix.prescription.id, 
                 prescription_fix.prescription.object.foreman_id,  # Добавляем foreman_id
@@ -112,9 +112,9 @@ class PrescriptionFixCreateSerializer(serializers.ModelSerializer):
                 user_role
             )
             
-            if folder_url:
-                # Сохраняем ссылку на папку с фото
-                prescription_fix.fix_photos_folder_url = folder_url
+            if urls:
+                # Сохраняем массив ссылок на фото
+                prescription_fix.fix_photos_folder_url = urls
                 prescription_fix.save(update_fields=["fix_photos_folder_url"])
         
         return prescription_fix

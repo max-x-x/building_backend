@@ -41,8 +41,8 @@ class ObjectCreateSerializer(serializers.ModelSerializer):
         if document_files:
             from api.utils.file_storage import upload_object_documents_base64
             
-            # Загружаем файлы и получаем URL папки
-            folder_url = upload_object_documents_base64(
+            # Загружаем файлы и получаем массив URL
+            urls = upload_object_documents_base64(
                 document_files, 
                 obj.id, 
                 obj.name, 
@@ -50,9 +50,9 @@ class ObjectCreateSerializer(serializers.ModelSerializer):
                 creator.role if creator else "system"
             )
             
-            if folder_url:
-                # Сохраняем ссылку на папку с документами
-                obj.documents_folder_url = folder_url
+            if urls:
+                # Сохраняем массив ссылок на документы
+                obj.documents_folder_url = urls
                 obj.save(update_fields=["documents_folder_url"])
             
         return obj
@@ -206,8 +206,8 @@ class ObjectPatchSerializer(serializers.Serializer):
         if document_files:
             from api.utils.file_storage import upload_object_documents_base64
             
-            # Загружаем файлы и получаем URL папки
-            folder_url = upload_object_documents_base64(
+            # Загружаем файлы и получаем массив URL
+            urls = upload_object_documents_base64(
                 document_files, 
                 obj.id, 
                 obj.name, 
@@ -215,9 +215,9 @@ class ObjectPatchSerializer(serializers.Serializer):
                 req.user.role
             )
             
-            if folder_url:
-                # Сохраняем ссылку на папку с документами
-                obj.documents_folder_url = folder_url
+            if urls:
+                # Сохраняем массив ссылок на документы
+                obj.documents_folder_url = urls
 
         obj.save()
 

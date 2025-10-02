@@ -50,7 +50,7 @@ class PrescriptionFix(TimeStampedMixin):
     attachments = models.JSONField("Вложения (URL'ы)", default=list, blank=True)
     
     # Ссылки на файловое хранилище
-    fix_photos_folder_url = models.URLField("URL папки с фото исправления", max_length=10000, blank=True, help_text="Ссылка на папку с фото исправления нарушения в файловом хранилище")
+    fix_photos_folder_url = models.JSONField("URL папки с фото исправления", default=list, blank=True, help_text="Массив ссылок на фото исправления нарушения в файловом хранилище")
 
     class Meta:
         verbose_name = "Исправление предписания"

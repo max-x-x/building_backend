@@ -22,7 +22,7 @@ class Delivery(TimeStampedMixin):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Инициатор (ССК)", on_delete=models.PROTECT, related_name="deliveries_created")
     
     # Ссылки на файловое хранилище
-    invoice_photos_folder_url = models.URLField("URL папки с фото накладных", max_length=10000, blank=True, help_text="Ссылка на папку с фото накладных в файловом хранилище")
+    invoice_photos_folder_url = models.JSONField("URL папки с фото накладных", default=list, blank=True, help_text="Массив ссылок на фото накладных в файловом хранилище")
 
     class Meta:
         verbose_name = "Поставка"

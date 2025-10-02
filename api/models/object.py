@@ -39,7 +39,7 @@ class ConstructionObject(TimeStampedMixin):
     )
     
     # Ссылки на файловое хранилище
-    documents_folder_url = models.URLField("URL папки с документами объекта", max_length=10000, blank=True, help_text="Ссылка на папку с документами объекта в файловом хранилище")
+    documents_folder_url = models.JSONField("URL папки с документами объекта", default=list, blank=True, help_text="Массив ссылок на документы объекта в файловом хранилище")
 
     class Meta:
         verbose_name = "Объект строительства"

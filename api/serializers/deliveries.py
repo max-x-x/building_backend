@@ -31,12 +31,12 @@ class DeliveryCreateSerializer(serializers.Serializer):
             user_name = request.user.full_name if request and request.user else "Система"
             user_role = request.user.role if request and request.user else "system"
             
-            # Загружаем фото и получаем URL папки
-            folder_url = upload_invoice_photos_base64(invoice_photos, delivery.object_id, delivery.id, user_name, user_role)
+            # Загружаем фото и получаем массив URL
+            urls = upload_invoice_photos_base64(invoice_photos, delivery.object_id, delivery.id, user_name, user_role)
             
-            if folder_url:
-                # Сохраняем ссылку на папку с фото
-                delivery.invoice_photos_folder_url = folder_url
+            if urls:
+                # Сохраняем массив ссылок на фото
+                delivery.invoice_photos_folder_url = urls
                 delivery.save(update_fields=["invoice_photos_folder_url"])
         
         return delivery
