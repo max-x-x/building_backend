@@ -25,21 +25,24 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
         if violation_photos:
             from api.utils.file_storage import upload_violation_photos
             
+            # Получаем информацию о пользователе из контекста
+            request = self.context.get("request")
+            user_name = request.user.full_name if request and request.user else "Система"
+            user_role = request.user.role if request and request.user else "system"
+            
             # Загружаем фото и получаем URL папки
-            folder_url = upload_violation_photos(violation_photos, prescription.id)
+            folder_url = upload_violation_photos(
+                violation_photos, 
+                prescription.id, 
+                prescription.title, 
+                user_name, 
+                user_role
+            )
             
             if folder_url:
                 # Сохраняем ссылку на папку с фото
                 prescription.violation_photos_folder_url = folder_url
                 prescription.save(update_fields=["violation_photos_folder_url"])
-                
-                # Логируем загрузку фото
-                from api.utils.logging import log_message, LogLevel, LogCategory
-                log_message(
-                    LogLevel.INFO, 
-                    LogCategory.PRESCRIPTION, 
-                    f"Загружены фото нарушения '{prescription.title}' в файловое хранилище: {folder_url}"
-                )
         
         return prescription
 
@@ -70,21 +73,24 @@ class PrescriptionFixCreateSerializer(serializers.ModelSerializer):
         if fix_photos:
             from api.utils.file_storage import upload_fix_photos
             
+            # Получаем информацию о пользователе из контекста
+            request = self.context.get("request")
+            user_name = request.user.full_name if request and request.user else "Система"
+            user_role = request.user.role if request and request.user else "system"
+            
             # Загружаем фото и получаем URL папки
-            folder_url = upload_fix_photos(fix_photos, prescription_fix.prescription.id)
+            folder_url = upload_fix_photos(
+                fix_photos, 
+                prescription_fix.prescription.id, 
+                prescription_fix.prescription.title, 
+                user_name, 
+                user_role
+            )
             
             if folder_url:
                 # Сохраняем ссылку на папку с фото
                 prescription_fix.fix_photos_folder_url = folder_url
                 prescription_fix.save(update_fields=["fix_photos_folder_url"])
-                
-                # Логируем загрузку фото
-                from api.utils.logging import log_message, LogLevel, LogCategory
-                log_message(
-                    LogLevel.INFO, 
-                    LogCategory.PRESCRIPTION, 
-                    f"Загружены фото исправления нарушения '{prescription_fix.prescription.title}' в файловое хранилище: {folder_url}"
-                )
         
         return prescription_fix
 

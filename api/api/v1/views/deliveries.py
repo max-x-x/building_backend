@@ -54,19 +54,11 @@ class DeliveryReceiveView(APIView):
             from api.utils.file_storage import upload_invoice_photos
             
             # Загружаем фото и получаем URL папки
-            folder_url = upload_invoice_photos(invoice_photos, d.id)
+            folder_url = upload_invoice_photos(invoice_photos, d.id, request.user.full_name, request.user.role)
             
             if folder_url:
                 # Сохраняем ссылку на папку с фото
                 d.invoice_photos_folder_url = folder_url
-                
-                # Логируем загрузку фото
-                from api.utils.logging import log_message, LogLevel, LogCategory
-                log_message(
-                    LogLevel.INFO, 
-                    LogCategory.DELIVERY, 
-                    f"Прораб загрузил фото накладных поставки #{d.id} в файловое хранилище: {folder_url}"
-                )
         
         d.status = "received"
         d.notes = ser.validated_data.get("notes","")

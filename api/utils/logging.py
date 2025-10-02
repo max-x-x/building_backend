@@ -200,3 +200,77 @@ def log_memo_created(object_name, memo_title, user_name, user_role):
     """Логирует создание мемо."""
     message = f"Создано мемо '{memo_title}' для объекта '{object_name}' пользователем {user_name} (роль: {user_role})"
     log_message(LogLevel.INFO, LogCategory.SYSTEM, message)
+
+
+# === ЛОГИРОВАНИЕ ОПЕРАЦИЙ С ФАЙЛОВЫМ ХРАНИЛИЩЕМ ===
+
+def log_file_upload_success(file_type, entity_name, entity_id, folder_url, user_name, user_role, file_count=1):
+    """Логирует успешную загрузку файлов в файловое хранилище."""
+    files_text = f"{file_count} файл(ов)" if file_count > 1 else "файл"
+    message = f"Успешно загружен {files_text} {file_type} для '{entity_name}' (ID: {entity_id}) в файловое хранилище: {folder_url}. Пользователь: {user_name} (роль: {user_role})"
+    log_message(LogLevel.INFO, LogCategory.FILE_STORAGE, message)
+
+
+def log_file_upload_failed(file_type, entity_name, entity_id, error_message, user_name, user_role, file_count=1):
+    """Логирует ошибку загрузки файлов в файловое хранилище."""
+    files_text = f"{file_count} файл(ов)" if file_count > 1 else "файл"
+    message = f"Ошибка загрузки {files_text} {file_type} для '{entity_name}' (ID: {entity_id}): {error_message}. Пользователь: {user_name} (роль: {user_role})"
+    log_message(LogLevel.ERROR, LogCategory.FILE_STORAGE, message)
+
+
+def log_file_storage_connection_failed(operation, error_message):
+    """Логирует ошибку подключения к файловому хранилищу."""
+    message = f"Ошибка подключения к файловому хранилищу при операции '{operation}': {error_message}"
+    log_message(LogLevel.ERROR, LogCategory.FILE_STORAGE, message)
+
+
+def log_file_storage_timeout(operation, timeout_seconds):
+    """Логирует таймаут при работе с файловым хранилищем."""
+    message = f"Таймаут при операции '{operation}' с файловым хранилищем (превышено {timeout_seconds} секунд)"
+    log_message(LogLevel.WARNING, LogCategory.FILE_STORAGE, message)
+
+
+def log_file_storage_response_error(operation, status_code, response_text):
+    """Логирует ошибку ответа от файлового хранилища."""
+    message = f"Ошибка ответа от файлового хранилища при операции '{operation}': HTTP {status_code}, ответ: {response_text[:200]}..."
+    log_message(LogLevel.ERROR, LogCategory.FILE_STORAGE, message)
+
+
+def log_object_documents_uploaded(object_name, object_id, folder_url, user_name, user_role, file_count):
+    """Логирует загрузку документов объекта."""
+    log_file_upload_success("документов объекта", object_name, object_id, folder_url, user_name, user_role, file_count)
+
+
+def log_object_documents_upload_failed(object_name, object_id, error_message, user_name, user_role, file_count):
+    """Логирует ошибку загрузки документов объекта."""
+    log_file_upload_failed("документов объекта", object_name, object_id, error_message, user_name, user_role, file_count)
+
+
+def log_violation_photos_uploaded(prescription_title, prescription_id, folder_url, user_name, user_role, file_count):
+    """Логирует загрузку фото нарушения."""
+    log_file_upload_success("фото нарушения", prescription_title, prescription_id, folder_url, user_name, user_role, file_count)
+
+
+def log_violation_photos_upload_failed(prescription_title, prescription_id, error_message, user_name, user_role, file_count):
+    """Логирует ошибку загрузки фото нарушения."""
+    log_file_upload_failed("фото нарушения", prescription_title, prescription_id, error_message, user_name, user_role, file_count)
+
+
+def log_fix_photos_uploaded(prescription_title, prescription_id, folder_url, user_name, user_role, file_count):
+    """Логирует загрузку фото исправления."""
+    log_file_upload_success("фото исправления", prescription_title, prescription_id, folder_url, user_name, user_role, file_count)
+
+
+def log_fix_photos_upload_failed(prescription_title, prescription_id, error_message, user_name, user_role, file_count):
+    """Логирует ошибку загрузки фото исправления."""
+    log_file_upload_failed("фото исправления", prescription_title, prescription_id, error_message, user_name, user_role, file_count)
+
+
+def log_invoice_photos_uploaded(delivery_id, folder_url, user_name, user_role, file_count):
+    """Логирует загрузку фото накладных."""
+    log_file_upload_success("фото накладных", f"поставка #{delivery_id}", delivery_id, folder_url, user_name, user_role, file_count)
+
+
+def log_invoice_photos_upload_failed(delivery_id, error_message, user_name, user_role, file_count):
+    """Логирует ошибку загрузки фото накладных."""
+    log_file_upload_failed("фото накладных", f"поставка #{delivery_id}", delivery_id, error_message, user_name, user_role, file_count)

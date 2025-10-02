@@ -25,21 +25,18 @@ class DeliveryCreateSerializer(serializers.Serializer):
         
         # Загружаем фото в файловое хранилище
         if invoice_photos:
+            # Получаем информацию о пользователе из контекста
+            request = self.context.get("request")
+            user_name = request.user.full_name if request and request.user else "Система"
+            user_role = request.user.role if request and request.user else "system"
+            
             # Загружаем фото и получаем URL папки
-            folder_url = upload_invoice_photos(invoice_photos, delivery.id)
+            folder_url = upload_invoice_photos(invoice_photos, delivery.id, user_name, user_role)
             
             if folder_url:
                 # Сохраняем ссылку на папку с фото
                 delivery.invoice_photos_folder_url = folder_url
                 delivery.save(update_fields=["invoice_photos_folder_url"])
-                
-                # Логируем загрузку фото
-                from api.utils.logging import log_message, LogLevel, LogCategory
-                log_message(
-                    LogLevel.INFO, 
-                    LogCategory.DELIVERY, 
-                    f"Загружены фото накладных поставки #{delivery.id} в файловое хранилище: {folder_url}"
-                )
         
         return delivery
 

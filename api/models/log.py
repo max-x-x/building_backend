@@ -22,6 +22,7 @@ class LogCategory(models.TextChoices):
     AREA = "area", "Полигоны"
     SYSTEM = "system", "Система"
     API = "api", "API"
+    FILE_STORAGE = "file_storage", "Файловое хранилище"
 
 
 class Log(TimeStampedMixin):

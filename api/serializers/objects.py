@@ -42,20 +42,18 @@ class ObjectCreateSerializer(serializers.ModelSerializer):
             from api.utils.file_storage import upload_object_documents
             
             # Загружаем файлы и получаем URL папки
-            folder_url = upload_object_documents(document_files, obj.id)
+            folder_url = upload_object_documents(
+                document_files, 
+                obj.id, 
+                obj.name, 
+                creator.full_name if creator else "Система", 
+                creator.role if creator else "system"
+            )
             
             if folder_url:
                 # Сохраняем ссылку на папку с документами
                 obj.documents_folder_url = folder_url
                 obj.save(update_fields=["documents_folder_url"])
-                
-                # Логируем загрузку документов
-                from api.utils.logging import log_message, LogLevel, LogCategory
-                log_message(
-                    LogLevel.INFO, 
-                    LogCategory.OBJECT, 
-                    f"Загружены документы объекта '{obj.name}' в файловое хранилище: {folder_url}"
-                )
             
         return obj
 
@@ -209,19 +207,17 @@ class ObjectPatchSerializer(serializers.Serializer):
             from api.utils.file_storage import upload_object_documents
             
             # Загружаем файлы и получаем URL папки
-            folder_url = upload_object_documents(document_files, obj.id)
+            folder_url = upload_object_documents(
+                document_files, 
+                obj.id, 
+                obj.name, 
+                req.user.full_name, 
+                req.user.role
+            )
             
             if folder_url:
                 # Сохраняем ссылку на папку с документами
                 obj.documents_folder_url = folder_url
-                
-                # Логируем загрузку документов
-                from api.utils.logging import log_message, LogLevel, LogCategory
-                log_message(
-                    LogLevel.INFO, 
-                    LogCategory.OBJECT, 
-                    f"Загружены дополнительные документы объекта '{obj.name}' в файловое хранилище: {folder_url}"
-                )
 
         obj.save()
 
