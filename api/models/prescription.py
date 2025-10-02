@@ -26,6 +26,9 @@ class Prescription(TimeStampedMixin):
     attachments = models.JSONField("Вложения (URL'ы)", default=list, blank=True)
     status = models.CharField("Статус", max_length=32, choices=STATUS, default="open")
     closed_at = models.DateTimeField("Закрыто", null=True, blank=True)
+    
+    # Ссылки на файловое хранилище
+    violation_photos_folder_url = models.URLField("URL папки с фото нарушения", blank=True, help_text="Ссылка на папку с фото нарушения в файловом хранилище")
 
     class Meta:
         verbose_name = "Предписание"
@@ -45,6 +48,9 @@ class PrescriptionFix(TimeStampedMixin):
     author = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Кто исправил (Прораб)", on_delete=models.PROTECT)
     comment = models.TextField("Комментарий")
     attachments = models.JSONField("Вложения (URL'ы)", default=list, blank=True)
+    
+    # Ссылки на файловое хранилище
+    fix_photos_folder_url = models.URLField("URL папки с фото исправления", blank=True, help_text="Ссылка на папку с фото исправления нарушения в файловом хранилище")
 
     class Meta:
         verbose_name = "Исправление предписания"

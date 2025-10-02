@@ -17,25 +17,46 @@ class UserBriefSerializer(serializers.ModelSerializer):
         fields = ("id", "email", "full_name", "role")
 
 class ObjectCreateSerializer(serializers.ModelSerializer):
-    # ссылки на файлы/папку из файлового хранилища
-    folder_url = serializers.URLField(required=False, allow_blank=True)
-    document_files = serializers.ListField(child=serializers.URLField(), required=False)
+    # файлы документов объекта (принимаются с фронта)
+    document_files = serializers.ListField(
+        child=serializers.FileField(), 
+        required=False, 
+        help_text="Список файлов документов объекта"
+    )
+    
     class Meta:
         model = ConstructionObject
-        fields = ("id", "uuid_obj", "name", "address", "folder_url", "document_files")
+        fields = ("id", "uuid_obj", "name", "address", "document_files")
 
     def create(self, validated_data):
         request = self.context.get("request")
         creator = request.user if request and request.user.is_authenticated else None
 
-        folder_url = validated_data.pop("folder_url", "")
         document_files = validated_data.pop("document_files", [])
+        
+        # Создаем объект
         obj = ConstructionObject.objects.create(created_by=creator, **validated_data)
-        # сохранить ссылки на документы
-        if folder_url:
-            ExecDocument.objects.create(object=obj, kind="general", pdf_url=folder_url, created_by=creator)
-        for url in document_files:
-            DocumentFile.objects.create(object=obj, name=url.rsplit("/", 1)[-1], url=url)
+        
+        # Загружаем файлы в файловое хранилище
+        if document_files:
+            from api.utils.file_storage import upload_object_documents
+            
+            # Загружаем файлы и получаем URL папки
+            folder_url = upload_object_documents(document_files, obj.id)
+            
+            if folder_url:
+                # Сохраняем ссылку на папку с документами
+                obj.documents_folder_url = folder_url
+                obj.save(update_fields=["documents_folder_url"])
+                
+                # Логируем загрузку документов
+                from api.utils.logging import log_message, LogLevel, LogCategory
+                log_message(
+                    LogLevel.INFO, 
+                    LogCategory.OBJECT, 
+                    f"Загружены документы объекта '{obj.name}' в файловое хранилище: {folder_url}"
+                )
+            
         return obj
 
 class AreaBriefSerializer(serializers.ModelSerializer):
@@ -59,7 +80,7 @@ class ObjectOutSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConstructionObject
-        fields = ("id", "uuid_obj", "name", "address", "status", "ssk", "foreman", "iko", "can_proceed", "areas", "work_progress", "created_at")
+        fields = ("id", "uuid_obj", "name", "address", "status", "ssk", "foreman", "iko", "can_proceed", "areas", "work_progress", "documents_folder_url", "created_at")
 
     def get_work_progress(self, obj):
         """Рассчитывает процент выполнения работ по графику."""
@@ -127,8 +148,12 @@ class ObjectPatchSerializer(serializers.Serializer):
     ssk_id = serializers.UUIDField(required=False, allow_null=True)
     primary_iko_id = serializers.UUIDField(required=False, allow_null=True)
     coordinates_id = serializers.IntegerField(required=False, allow_null=True)
-    folder_url = serializers.URLField(required=False, allow_blank=True)
-    document_files = serializers.ListField(child=serializers.URLField(), required=False)
+    # файлы документов объекта (принимаются с фронта)
+    document_files = serializers.ListField(
+        child=serializers.FileField(), 
+        required=False, 
+        help_text="Список файлов документов объекта"
+    )
     can_continue_construction = serializers.BooleanField(required=False)
 
     def validate(self, data):
@@ -178,14 +203,27 @@ class ObjectPatchSerializer(serializers.Serializer):
         if "can_continue_construction" in self.validated_data:
             obj.can_proceed = bool(self.validated_data["can_continue_construction"])
 
-        obj.save()
-
         # документы
-        folder_url = self.validated_data.get("folder_url")
-        if folder_url:
-            ExecDocument.objects.create(object=obj, kind="general", pdf_url=folder_url, created_by=req.user)
-        for url in self.validated_data.get("document_files", []) or []:
-            DocumentFile.objects.create(object=obj, name=url.rsplit("/", 1)[-1], url=url)
+        document_files = self.validated_data.get("document_files", [])
+        if document_files:
+            from api.utils.file_storage import upload_object_documents
+            
+            # Загружаем файлы и получаем URL папки
+            folder_url = upload_object_documents(document_files, obj.id)
+            
+            if folder_url:
+                # Сохраняем ссылку на папку с документами
+                obj.documents_folder_url = folder_url
+                
+                # Логируем загрузку документов
+                from api.utils.logging import log_message, LogLevel, LogCategory
+                log_message(
+                    LogLevel.INFO, 
+                    LogCategory.OBJECT, 
+                    f"Загружены дополнительные документы объекта '{obj.name}' в файловое хранилище: {folder_url}"
+                )
+
+        obj.save()
 
         # аудит смен ролей
         for field in ("ssk", "foreman", "iko"):
@@ -224,7 +262,7 @@ class DeliveryDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Delivery
         fields = ("id", "uuid_delivery", "planned_date", "notes", "status", 
-                "created_by", "invoices", "created_at", "modified_at")
+                "created_by", "invoices", "invoice_photos_folder_url", "created_at", "modified_at")
 
 class WorkItemDetailSerializer(serializers.ModelSerializer):
     """Детальный сериализатор для работы в графике."""
@@ -256,8 +294,15 @@ class PrescriptionDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Prescription
         fields = ("id", "title", "description", "status", "requires_stop", 
-                "requires_personal_recheck", "attachments", "author", 
+                "requires_personal_recheck", "attachments", "violation_photos_folder_url", "author", 
                 "created_at", "closed_at", "modified_at")
+
+class PrescriptionFixDetailSerializer(serializers.ModelSerializer):
+    """Детальный сериализатор для исправления нарушения."""
+    class Meta:
+        model = PrescriptionFix
+        fields = ("id", "comment", "attachments", "fix_photos_folder_url", "author", 
+                "created_at", "modified_at")
 
 class WorkDetailSerializer(serializers.ModelSerializer):
     """Детальный сериализатор для работы/задачи."""
@@ -314,7 +359,7 @@ class ObjectFullDetailSerializer(serializers.ModelSerializer):
             # Основная информация
             "id", "uuid_obj", "name", "address", "status", "can_proceed",
             "ssk", "foreman", "iko", "created_by", "areas", "work_progress",
-            "created_at", "modified_at",
+            "documents_folder_url", "created_at", "modified_at",
             
             # Связанные данные
             "deliveries", "work_plans", "prescriptions", "works", 

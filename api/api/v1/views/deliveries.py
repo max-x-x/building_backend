@@ -26,6 +26,7 @@ class DeliveriesCreateView(APIView):
             object=obj,
             planned_date=ser.validated_data.get("planned_date"),
             notes=ser.validated_data.get("notes",""),
+            invoice_photos_folder_url=ser.validated_data.get("invoice_photos_folder_url", ""),
             created_by=request.user
         )
         
@@ -46,9 +47,30 @@ class DeliveryReceiveView(APIView):
             return Response({"detail":"Forbidden"}, status=403)
         if request.user.role != Roles.ADMIN and d.object.foreman_id != request.user.id:
             return Response({"detail":"Forbidden"}, status=403)
+        
+        # Обрабатываем фото накладных
+        invoice_photos = ser.validated_data.get("invoice_photos", [])
+        if invoice_photos:
+            from api.utils.file_storage import upload_invoice_photos
+            
+            # Загружаем фото и получаем URL папки
+            folder_url = upload_invoice_photos(invoice_photos, d.id)
+            
+            if folder_url:
+                # Сохраняем ссылку на папку с фото
+                d.invoice_photos_folder_url = folder_url
+                
+                # Логируем загрузку фото
+                from api.utils.logging import log_message, LogLevel, LogCategory
+                log_message(
+                    LogLevel.INFO, 
+                    LogCategory.DELIVERY, 
+                    f"Прораб загрузил фото накладных поставки #{d.id} в файловое хранилище: {folder_url}"
+                )
+        
         d.status = "received"
         d.notes = ser.validated_data.get("notes","")
-        d.save(update_fields=["status","notes","modified_at"])
+        d.save(update_fields=["status","notes","invoice_photos_folder_url","modified_at"])
         return Response(DeliveryOutSerializer(d).data, status=201)
 
 class DeliveriesListView(APIView):

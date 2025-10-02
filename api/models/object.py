@@ -37,6 +37,9 @@ class ConstructionObject(TimeStampedMixin):
         settings.AUTH_USER_MODEL, verbose_name="Кем создан",
         null=True, blank=True, on_delete=models.SET_NULL, related_name="created_objects"
     )
+    
+    # Ссылки на файловое хранилище
+    documents_folder_url = models.URLField("URL папки с документами объекта", blank=True, help_text="Ссылка на папку с документами объекта в файловом хранилище")
 
     class Meta:
         verbose_name = "Объект строительства"

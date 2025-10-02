@@ -47,6 +47,7 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 NOTIFY_SERVICE_URL = os.getenv("NOTIFY_SERVICE_URL", "")
+FILE_STORAGE_URL = os.getenv("FILE_STORAGE_URL", "https://building-s3-api.itc-hub.ru")
 
 # Настройки логирования
 LOGGING = {

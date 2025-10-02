@@ -20,6 +20,9 @@ class Delivery(TimeStampedMixin):
     notes = models.TextField("Примечания", blank=True)
     status = models.CharField("Статус", max_length=20, choices=STATUS, default="scheduled")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Инициатор (ССК)", on_delete=models.PROTECT, related_name="deliveries_created")
+    
+    # Ссылки на файловое хранилище
+    invoice_photos_folder_url = models.URLField("URL папки с фото накладных", blank=True, help_text="Ссылка на папку с фото накладных в файловом хранилище")
 
     class Meta:
         verbose_name = "Поставка"

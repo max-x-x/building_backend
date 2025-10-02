@@ -15,7 +15,7 @@ class UserAdmin(BaseUserAdmin):
     form = UserChangeForm               # форма изменения (показывает хэш)
     model = User
 
-    list_display = ("email", "full_name", "role_badge", "phone", "is_active", "is_staff", "date_joined")
+    list_display = ("id", "email", "full_name", "role_badge", "phone", "is_active", "is_staff", "date_joined")
     list_filter = ("role", "is_active", "is_staff", "date_joined")
     search_fields = ("email", "full_name", "phone")
     ordering = ("-date_joined",)
@@ -24,7 +24,7 @@ class UserAdmin(BaseUserAdmin):
 
     fieldsets = (
         ("👤 Личные данные", {
-            "fields": ("email", "full_name", "phone", "role", "password"),
+            "fields": ("id", "email", "full_name", "phone", "role", "password"),
             "classes": ("wide",)
         }),
         ("🔐 Права доступа", {

@@ -33,7 +33,7 @@ class DeliveryAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ("🚚 Основная информация", {
-            "fields": ("object", "planned_date", "notes", "status"),
+            "fields": ("object", "planned_date", "notes", "status", "invoice_photos_folder_url"),
             "classes": ("wide",)
         }),
         ("👤 Ответственные", {

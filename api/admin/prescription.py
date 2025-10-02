@@ -33,7 +33,7 @@ class PrescriptionAdmin(admin.ModelAdmin):
             "classes": ("wide",)
         }),
         ("📎 Вложения", {
-            "fields": ("attachments",),
+            "fields": ("attachments", "violation_photos_folder_url"),
             "classes": ("collapse",)
         }),
         ("📅 Даты", {
@@ -104,7 +104,7 @@ class PrescriptionFixAdmin(admin.ModelAdmin):
             "classes": ("wide",)
         }),
         ("📎 Вложения", {
-            "fields": ("attachments",),
+            "fields": ("attachments", "fix_photos_folder_url"),
             "classes": ("collapse",)
         }),
         ("📅 Даты", {
