@@ -363,6 +363,13 @@ def upload_object_documents_base64(base64_files: List[str], object_id: int, obje
         # Декодируем base64 в байты
         try:
             import base64
+            # Убираем префикс data:image/...;base64, если есть
+            if ',' in base64_data:
+                base64_data = base64_data.split(',', 1)[1]
+            # Добавляем padding если необходимо
+            missing_padding = len(base64_data) % 4
+            if missing_padding:
+                base64_data += '=' * (4 - missing_padding)
             file_data = base64.b64decode(base64_data)
             result = file_storage_client.upload_object_pdf(object_id, file_data)
             if result and result.get('url'):
@@ -438,6 +445,13 @@ def upload_violation_photos_base64(base64_files: List[str], prescription_id: int
         # Декодируем base64 в байты
         try:
             import base64
+            # Убираем префикс data:image/...;base64, если есть
+            if ',' in base64_data:
+                base64_data = base64_data.split(',', 1)[1]
+            # Добавляем padding если необходимо
+            missing_padding = len(base64_data) % 4
+            if missing_padding:
+                base64_data += '=' * (4 - missing_padding)
             file_data = base64.b64decode(base64_data)
             result = file_storage_client.upload_violation_creation(tag, prescription_id, [file_data])
             
@@ -577,6 +591,13 @@ def upload_fix_photos_base64(base64_files: List[str], prescription_id: int, fore
         # Декодируем base64 в байты
         try:
             import base64
+            # Убираем префикс data:image/...;base64, если есть
+            if ',' in base64_data:
+                base64_data = base64_data.split(',', 1)[1]
+            # Добавляем padding если необходимо
+            missing_padding = len(base64_data) % 4
+            if missing_padding:
+                base64_data += '=' * (4 - missing_padding)
             file_data = base64.b64decode(base64_data)
             result = file_storage_client.upload_violation_correction(prescription_id, foreman_id, [file_data])
             
@@ -676,6 +697,13 @@ def upload_invoice_photos_base64(base64_files: List[str], object_id: int, delive
         # Декодируем base64 в байты
         try:
             import base64
+            # Убираем префикс data:image/...;base64, если есть
+            if ',' in base64_data:
+                base64_data = base64_data.split(',', 1)[1]
+            # Добавляем padding если необходимо
+            missing_padding = len(base64_data) % 4
+            if missing_padding:
+                base64_data += '=' * (4 - missing_padding)
             file_data = base64.b64decode(base64_data)
             result = file_storage_client.upload_delivery_photos(object_id, delivery_id, [file_data])
             
