@@ -42,7 +42,7 @@ class ObjectsListCreateView(APIView):
         status_param = request.query_params.get("status")
         mine = request.query_params.get("mine")
 
-        qs = ConstructionObject.objects.select_related("ssk", "foreman", "iko").prefetch_related("areas").all()
+        qs = ConstructionObject.objects.select_related("ssk", "foreman", "iko").prefetch_related("areas__sub_areas").all()
 
         if request.user.role == Roles.IKO:
             qs = qs.filter(iko=request.user)
@@ -81,7 +81,7 @@ class ObjectsListCreateView(APIView):
 class ObjectsDetailView(APIView):
     def get(self, request, id: int):
         try:
-            obj = ConstructionObject.objects.select_related("ssk", "foreman", "iko").prefetch_related("areas").get(id=id)
+            obj = ConstructionObject.objects.select_related("ssk", "foreman", "iko").prefetch_related("areas__sub_areas").get(id=id)
         except ConstructionObject.DoesNotExist:
             return Response({"detail": "Not found"}, status=404)
 
@@ -220,7 +220,7 @@ class ObjectFullDetailView(APIView):
             obj = ConstructionObject.objects.select_related(
                 "ssk", "foreman", "iko", "created_by"
             ).prefetch_related(
-                "areas",
+                "areas__sub_areas",
                 "deliveries__invoices__materials",
                 "work_plans__items__schedule_item",
                 "prescriptions",

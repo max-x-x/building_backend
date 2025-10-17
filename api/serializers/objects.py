@@ -5,7 +5,7 @@ from api.models.user import User, Roles
 from api.models.object import ConstructionObject, ObjectActivation
 from api.models.documents import ExecDocument, DocumentFile
 from api.models.object import ObjectRoleAudit
-from api.models.area import Area
+from api.models.area import Area, SubArea
 from api.models.work_plan import WorkPlan, WorkItem, ScheduleItem
 from api.models.delivery import Delivery, Invoice, Material
 from api.models.prescription import Prescription, PrescriptionFix
@@ -53,12 +53,24 @@ class ObjectCreateSerializer(serializers.ModelSerializer):
             
         return obj
 
-class AreaBriefSerializer(serializers.ModelSerializer):
+class SubAreaBriefSerializer(serializers.ModelSerializer):
     geometry_type = serializers.SerializerMethodField()
     
     class Meta:
+        model = SubArea
+        fields = ("id", "name", "geometry", "geometry_type", "color", "work_item")
+    
+    def get_geometry_type(self, obj):
+        return obj.get_geometry_type()
+
+
+class AreaBriefSerializer(serializers.ModelSerializer):
+    geometry_type = serializers.SerializerMethodField()
+    sub_areas = SubAreaBriefSerializer(many=True, read_only=True)
+    
+    class Meta:
         model = Area
-        fields = ("id", "uuid_area", "name", "geometry", "geometry_type")
+        fields = ("id", "uuid_area", "name", "geometry", "geometry_type", "sub_areas")
     
     def get_geometry_type(self, obj):
         return obj.get_geometry_type()
