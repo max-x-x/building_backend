@@ -221,6 +221,7 @@ class ObjectFullDetailView(APIView):
                 "ssk", "foreman", "iko", "created_by"
             ).prefetch_related(
                 "areas__sub_areas",
+                "deliveries__work_item",
                 "deliveries__invoices__materials",
                 "work_plans__items__schedule_item",
                 "prescriptions",
