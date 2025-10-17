@@ -3,6 +3,20 @@ from django.db import transaction
 from api.models.work_plan import WorkPlan, WorkItem, ScheduleItem
 from api.models.object import ConstructionObject
 from api.models.user import Roles
+from api.models.area import Area, SubArea
+
+class SubAreaCreateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255)
+    geometry = serializers.JSONField()
+    color = serializers.CharField(max_length=7, default="#FF0000")
+
+    def validate_geometry(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Geometry должен быть объектом")
+        geom_type = value.get("type")
+        if geom_type not in ["Polygon", "MultiPolygon"]:
+            raise serializers.ValidationError("Поддерживаются только Polygon и MultiPolygon")
+        return value
 
 class WorkItemCreateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=300)
@@ -11,6 +25,7 @@ class WorkItemCreateSerializer(serializers.Serializer):
     start_date = serializers.DateField()
     end_date = serializers.DateField()
     document_url = serializers.URLField(required=False, allow_blank=True)
+    sub_areas = SubAreaCreateSerializer(many=True, required=False)
 
     def validate(self, data):
         if data["end_date"] < data["start_date"]:
@@ -58,6 +73,30 @@ class WorkPlanCreateSerializer(serializers.Serializer):
                 document_url=it.get("document_url", ""),
             ))
         WorkItem.objects.bulk_create(items)
+
+        # Создаём подполигоны для каждого WorkItem
+        created_items = WorkItem.objects.filter(plan=plan)
+        
+        # Получаем первую область объекта (или создаём если нет)
+        area = obj.areas.first()
+        if not area:
+            area = Area.objects.create(
+                name=f"Основная область {obj.name}",
+                geometry={"type": "Polygon", "coordinates": []},
+                object=obj
+            )
+        
+        for i, it in enumerate(items_data):
+            work_item = created_items[i]
+            sub_areas_data = it.get("sub_areas", [])
+            for sub_area_data in sub_areas_data:
+                SubArea.objects.create(
+                    name=sub_area_data["name"],
+                    geometry=sub_area_data["geometry"],
+                    color=sub_area_data["color"],
+                    area=area,
+                    work_item=work_item,
+                )
 
         sched = [
             ScheduleItem(
