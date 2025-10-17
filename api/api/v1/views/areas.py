@@ -2,8 +2,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from api.models.area import Area
-from api.serializers.areas import AreaCreateSerializer, AreaOutSerializer, AreaListOutSerializer
+from api.models.area import Area, SubArea
+from api.serializers.areas import AreaCreateSerializer, AreaOutSerializer, AreaListOutSerializer, SubAreaCreateSerializer, SubAreaOutSerializer
 from api.api.v1.views.objects import _paginated
 from api.utils.logging import log_area_created, log_area_viewed
 
@@ -49,3 +49,11 @@ class AreasListView(APIView):
         
         page, total = _paginated(qs, request)
         return Response(AreaListOutSerializer({"items": page, "total": total}).data, status=200)
+
+
+class SubAreasCreateView(APIView):
+    def post(self, request):
+        ser = SubAreaCreateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        sub = ser.save()
+        return Response(SubAreaOutSerializer(sub).data, status=status.HTTP_201_CREATED)

@@ -4,14 +4,14 @@ from api.models.work_plan import WorkPlan, WorkItem, ScheduleItem
 from api.models.notify import Notification
 from api.models.prescription import Prescription, PrescriptionFix
 from api.models.visit import QrCode, VisitRequest
-from api.models.area import Area
+from api.models.area import Area, SubArea
 from api.models.delivery import Delivery, Invoice, Material, LabOrder
 from api.models.log import Log, LogLevel, LogCategory
 
 __all__ = ["Roles", "User", "RefreshToken", "Invitation",
            "ConstructionObject", "WorkPlan", "WorkItem", "ScheduleItem",
            "ObjectActivation", "Notification", "Prescription",
-           "PrescriptionFix", "QrCode", "VisitRequest", "Area",
+           "PrescriptionFix", "QrCode", "VisitRequest", "Area", "SubArea",
            "Delivery", "Invoice", "Material", "LabOrder",
            "Log", "LogLevel", "LogCategory"]
 

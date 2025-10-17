@@ -22,7 +22,7 @@ from api.api.v1.views.users import UsersMeView, UsersDetailView, UsersListCreate
 from api.api.v1.views.work_plans import (WorkPlanCreateView, WorkPlanDetailView, WorkPlansListView,
                                          WorkPlanAddVersionView, WorkPlanRequestChangeView, WorkPlanApproveChangeView,
                                          WorkItemSetStatusView)
-from api.api.v1.views.areas import AreasCreateView, AreasDetailView, AreasListView
+from api.api.v1.views.areas import AreasCreateView, AreasDetailView, AreasListView, SubAreasCreateView
 from api.api.v1.views.works import WorksListView, WorkCreateView
 from api.api.v1.views.admin import AdminStatsView
 from api.api.v1.views.logs import LogsListView, LogsStatsView
@@ -90,6 +90,7 @@ urlpatterns = [
     path("areas", AreasCreateView.as_view(), name="areas-create"),
     path("areas/<int:id>", AreasDetailView.as_view(), name="areas-detail"),
     path("areas/list", AreasListView.as_view(), name="areas-list"),
+    path("sub-areas", SubAreasCreateView.as_view(), name="sub-areas-create"),
 
     path("admin/stats", AdminStatsView.as_view(), name="admin-stats"),
 
