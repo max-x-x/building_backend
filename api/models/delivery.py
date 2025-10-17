@@ -3,6 +3,7 @@ from django.db import models
 from django.conf import settings
 from api.models.timestamp import TimeStampedMixin
 from api.models.object import ConstructionObject
+from api.models.work_plan import WorkItem
 
 class Delivery(TimeStampedMixin):
     STATUS = (
@@ -16,6 +17,7 @@ class Delivery(TimeStampedMixin):
 
     uuid_delivery = models.UUIDField("UUID поставки", default=uuid.uuid4, editable=False)
     object = models.ForeignKey(ConstructionObject, verbose_name="Объект", on_delete=models.CASCADE, related_name="deliveries")
+    work_item = models.ForeignKey(WorkItem, verbose_name="Позиция перечня работ", on_delete=models.CASCADE, related_name="deliveries", null=True, blank=True)
     planned_date = models.DateField("Плановая дата", null=True, blank=True)
     notes = models.TextField("Примечания", blank=True)
     status = models.CharField("Статус", max_length=20, choices=STATUS, default="scheduled")
@@ -29,7 +31,8 @@ class Delivery(TimeStampedMixin):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"Delivery {self.object_id} [{self.get_status_display()}]"
+        work_item_info = f" для {self.work_item.name}" if self.work_item else ""
+        return f"Поставка {self.object_id}{work_item_info} [{self.get_status_display()}]"
 
 
 class Invoice(TimeStampedMixin):

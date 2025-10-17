@@ -58,7 +58,7 @@ class DeliveryReceiveView(APIView):
 class DeliveriesListView(APIView):
     def get(self, request):
         visible = _visible_object_ids_for_user(request.user)
-        qs = Delivery.objects.filter(object_id__in=visible).prefetch_related('invoices', 'materials').order_by("-created_at")
+        qs = Delivery.objects.filter(object_id__in=visible).select_related('work_item').prefetch_related('invoices', 'materials').order_by("-created_at")
         object_id = request.query_params.get("object_id")
         if object_id:
             qs = qs.filter(object_id=object_id)
@@ -274,7 +274,7 @@ class DeliveryDetailView(APIView):
 
     def get(self, request, id: int):
         try:
-            delivery = Delivery.objects.select_related("object", "created_by").prefetch_related("invoices__materials").get(id=id)
+            delivery = Delivery.objects.select_related("object", "created_by", "work_item").prefetch_related("invoices__materials").get(id=id)
         except Delivery.DoesNotExist:
             return Response({"detail": "Delivery not found"}, status=404)
 

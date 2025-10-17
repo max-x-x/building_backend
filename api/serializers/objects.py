@@ -255,12 +255,18 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
         fields = ("id", "uuid_invoice", "pdf_url", "folder_url", "data", 
                 "materials", "created_at", "modified_at")
 
+class WorkItemBriefDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkItem
+        fields = ("id", "uuid_wi", "name", "quantity", "unit", "start_date", "end_date")
+
 class DeliveryDetailSerializer(serializers.ModelSerializer):
     invoices = InvoiceDetailSerializer(many=True, read_only=True)
+    work_item = WorkItemBriefDetailSerializer(read_only=True)
     
     class Meta:
         model = Delivery
-        fields = ("id", "uuid_delivery", "planned_date", "notes", "status", 
+        fields = ("id", "uuid_delivery", "work_item", "planned_date", "notes", "status", 
                 "created_by", "invoices", "invoice_photos_folder_url", "created_at", "modified_at")
 
 class WorkItemDetailSerializer(serializers.ModelSerializer):
