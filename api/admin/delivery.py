@@ -23,17 +23,17 @@ class InvoiceInline(admin.TabularInline):
 
 @admin.register(Delivery)
 class DeliveryAdmin(admin.ModelAdmin):
-    list_display = ("id", "object", "status_badge", "planned_date", "created_by", "created_at")
+    list_display = ("id", "object", "work_item", "status_badge", "planned_date", "created_by", "created_at")
     list_filter = ("status", "planned_date", "created_at")
     search_fields = ("object__name", "notes", "created_by__email")
     readonly_fields = ("uuid_delivery", "created_at", "modified_at")
-    autocomplete_fields = ("object", "created_by")
+    autocomplete_fields = ("object", "work_item", "created_by")
     list_per_page = 25
     inlines = [InvoiceInline]
 
     fieldsets = (
         ("🚚 Основная информация", {
-            "fields": ("object", "planned_date", "notes", "status", "invoice_photos_folder_url"),
+            "fields": ("object", "work_item", "planned_date", "notes", "status", "invoice_photos_folder_url"),
             "classes": ("wide",)
         }),
         ("👤 Ответственные", {

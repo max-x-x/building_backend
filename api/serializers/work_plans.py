@@ -1,9 +1,10 @@
 from rest_framework import serializers
 from django.db import transaction
-from api.models.work_plan import WorkPlan, WorkItem, ScheduleItem
+from api.models.work_plan import WorkPlan, WorkItem, ScheduleItem, WorkItemChangeRequest
 from api.models.object import ConstructionObject
 from api.models.user import Roles
 from api.models.area import Area, SubArea
+from api.models.delivery import Delivery, Material
 
 class SubAreaCreateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
@@ -74,10 +75,8 @@ class WorkPlanCreateSerializer(serializers.Serializer):
             ))
         WorkItem.objects.bulk_create(items)
 
-        # Создаём подполигоны для каждого WorkItem
         created_items = WorkItem.objects.filter(plan=plan)
         
-        # Получаем первую область объекта (или создаём если нет)
         area = obj.areas.first()
         if not area:
             area = Area.objects.create(
@@ -117,3 +116,128 @@ class WorkPlanOutSerializer(serializers.ModelSerializer):
 
 class WorkItemSetStatusSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=["planned","in_progress","done"])
+
+class SubAreaBriefSerializer(serializers.ModelSerializer):
+    geometry_type = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SubArea
+        fields = ("id", "name", "geometry", "color", "geometry_type", "created_at")
+    
+    def get_geometry_type(self, obj):
+        return obj.get_geometry_type()
+
+class MaterialBriefSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Material
+        fields = ("id", "uuid_material", "material_name", "material_quantity", 
+                "material_size", "material_volume", "material_netto", "is_confirmed", "created_at")
+
+class DeliveryBriefSerializer(serializers.ModelSerializer):
+    materials = MaterialBriefSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = Delivery
+        fields = ("id", "uuid_delivery", "planned_date", "notes", "status", 
+                "created_by", "materials", "invoice_photos_folder_url", "created_at", "modified_at")
+
+class WorkItemDetailSerializer(serializers.ModelSerializer):
+    status = serializers.SerializerMethodField()
+    sub_areas = SubAreaBriefSerializer(many=True, read_only=True)
+    deliveries = DeliveryBriefSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = WorkItem
+        fields = ("id", "uuid_wi", "name", "quantity", "unit", "start_date", "end_date", 
+                "document_url", "status", "sub_areas", "deliveries", "created_at", "modified_at")
+    
+    def get_status(self, obj):
+        try:
+            schedule_item = obj.schedule_item
+            return schedule_item.status
+        except:
+            return "planned"
+
+
+class WorkItemChangeSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False, allow_null=True, help_text="ID позиции (если не указан - новая позиция)")
+    name = serializers.CharField(max_length=300)
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    unit = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    start_date = serializers.DateField()
+    end_date = serializers.DateField()
+    document_url = serializers.URLField(required=False, allow_blank=True)
+    sub_areas = SubAreaCreateSerializer(many=True, required=False)
+
+    def validate(self, data):
+        if data["end_date"] < data["start_date"]:
+            raise serializers.ValidationError("Дата окончания раньше даты начала")
+        
+        return data
+
+
+class WorkPlanChangeRequestSerializer(serializers.Serializer):
+    work_plan_id = serializers.IntegerField()
+    comment = serializers.CharField(required=False, allow_blank=True)
+    items = WorkItemChangeSerializer(many=True, help_text="Новый список позиций перечня работ")
+
+    def validate_work_plan_id(self, value):
+        try:
+            work_plan = WorkPlan.objects.get(id=value)
+        except WorkPlan.DoesNotExist:
+            raise serializers.ValidationError("Перечень работ не найден")
+        return value
+
+    def validate(self, data):
+        request = self.context["request"]
+        work_plan_id = data["work_plan_id"]
+        
+        try:
+            work_plan = WorkPlan.objects.get(id=work_plan_id)
+        except WorkPlan.DoesNotExist:
+            raise serializers.ValidationError("Перечень работ не найден")
+        
+        if request.user.role not in [Roles.FOREMAN, Roles.SSK, Roles.ADMIN]:
+            raise serializers.ValidationError("Недостаточно прав для изменения графика работ")
+        
+        if request.user.role == Roles.FOREMAN:
+            if work_plan.object.foreman_id != request.user.id:
+                raise serializers.ValidationError("Прораб может изменять только графики работ своих объектов")
+        elif request.user.role == Roles.SSK:
+            if work_plan.object.ssk_id != request.user.id:
+                raise serializers.ValidationError("ССК может изменять только графики работ своих объектов")
+        
+        self.context["work_plan"] = work_plan
+        return data
+
+
+class WorkItemChangeRequestOutSerializer(serializers.ModelSerializer):
+    requested_by_name = serializers.SerializerMethodField()
+    decided_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = WorkItemChangeRequest
+        fields = ("id", "uuid_change_request", "work_plan", "requested_by", "requested_by_name",
+                 "decided_by", "decided_by_name", "comment", "status", "old_items_data", 
+                 "new_items_data", "created_at", "modified_at")
+    
+    def get_requested_by_name(self, obj):
+        return obj.requested_by.full_name if obj.requested_by else None
+    
+    def get_decided_by_name(self, obj):
+        return obj.decided_by.full_name if obj.decided_by else None
+
+
+class WorkPlanChangeDecisionSerializer(serializers.Serializer):
+    decision = serializers.ChoiceField(choices=["approve", "reject", "edit"])
+    comment = serializers.CharField(required=False, allow_blank=True)
+    edited_items = WorkItemChangeSerializer(many=True, required=False, help_text="Отредактированные позиции (только для decision='edit')")
+
+    def validate(self, data):
+        decision = data.get("decision")
+        edited_items = data.get("edited_items", [])
+        
+        if decision == "edit" and not edited_items:
+            raise serializers.ValidationError("При редактировании необходимо предоставить отредактированные позиции")
+        
+        return data

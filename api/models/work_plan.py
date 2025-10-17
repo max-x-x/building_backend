@@ -96,3 +96,32 @@ class WorkPlanChangeRequest(TimeStampedMixin):
 
     def __str__(self):
         return f"Change WP#{self.plan_id} [{self.status}]"
+
+
+class WorkItemChangeRequest(TimeStampedMixin):
+    STATUS_CHOICES = (
+        ("pending", "Ожидает"),
+        ("approved", "Принято"), 
+        ("rejected", "Отклонено"),
+        ("edited", "Отредактировано")
+    )
+    
+    uuid_change_request = models.UUIDField("UUID запроса на изменение", default=uuid.uuid4, editable=False)
+    work_plan = models.ForeignKey(WorkPlan, verbose_name="Перечень работ", on_delete=models.CASCADE, related_name="item_change_requests")
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Кто запросил", on_delete=models.PROTECT, related_name="work_item_change_requests")
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Кто принял решение", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    changes_data = models.JSONField("Данные изменений", default=dict, help_text="JSON с изменениями позиций")
+    comment = models.TextField("Комментарий", blank=True)
+    status = models.CharField("Статус", max_length=16, choices=STATUS_CHOICES, default="pending")
+
+    old_items_data = models.JSONField("Старые данные позиций", default=list, help_text="JSON с исходными данными позиций")
+    new_items_data = models.JSONField("Новые данные позиций", default=list, help_text="JSON с предлагаемыми данными позиций")
+
+    class Meta:
+        verbose_name = "Запрос на изменение позиций перечня"
+        verbose_name_plural = "Запросы на изменение позиций перечня"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"WorkItem Change #{self.id} for WP#{self.work_plan_id} [{self.status}]"

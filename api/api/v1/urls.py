@@ -21,7 +21,8 @@ from api.api.v1.views.prescriptions import (PrescriptionFixView, PrescriptionVer
 from api.api.v1.views.users import UsersMeView, UsersDetailView, UsersListCreateView
 from api.api.v1.views.work_plans import (WorkPlanCreateView, WorkPlanDetailView, WorkPlansListView,
                                          WorkPlanAddVersionView, WorkPlanRequestChangeView, WorkPlanApproveChangeView,
-                                         WorkItemSetStatusView)
+                                         WorkItemSetStatusView, WorkItemDetailView, WorkPlanChangeRequestView,
+                                         WorkPlanChangeDecisionView, WorkPlanChangeRequestsListView)
 from api.api.v1.views.areas import AreasCreateView, AreasDetailView, AreasListView, SubAreasCreateView
 from api.api.v1.views.works import WorksListView, WorkCreateView
 from api.api.v1.views.admin import AdminStatsView
@@ -68,6 +69,11 @@ urlpatterns = [
     path("work-plans/<int:id>/request-change", WorkPlanRequestChangeView.as_view(), name="work-plan-request-change"),
     path("work-plans/<int:id>/approve-change", WorkPlanApproveChangeView.as_view(), name="work-plan-approve-change"),
     path("work-items/<int:id>/status", WorkItemSetStatusView.as_view(), name="work-item-set-status"),
+    path("work-items/<int:id>", WorkItemDetailView.as_view(), name="work-item-detail"),
+    
+    path("work-plans/change-request", WorkPlanChangeRequestView.as_view(), name="work-plan-change-request"),
+    path("work-plans/change-requests", WorkPlanChangeRequestsListView.as_view(), name="work-plan-change-requests-list"),
+    path("work-plans/change-requests/<int:change_request_id>/decision", WorkPlanChangeDecisionView.as_view(), name="work-plan-change-decision"),
 
     path("daily-checklists", DailyChecklistsView.as_view(), name="daily-checklists"),
     path("daily-checklists/<int:id>/review", DailyChecklistReviewView.as_view(), name="daily-checklist-review"),
