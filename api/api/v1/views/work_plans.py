@@ -120,25 +120,113 @@ class WorkPlanApproveChangeView(APIView):
 
 
 class WorkItemSetStatusView(APIView):
-    permission_classes = [RoleRequired.as_permitted(Roles.SSK, Roles.ADMIN)]
-
     def post(self, request, id: int):
         try:
-            si = ScheduleItem.objects.select_related("object", "work_item", "object__ssk").get(id=id)
+            work_item = WorkItem.objects.select_related('plan__object', 'schedule_item').get(id=id)
+        except WorkItem.DoesNotExist:
+            return Response({"detail": "WorkItem not found"}, status=404)
+        
+        # Проверяем наличие ScheduleItem
+        try:
+            schedule_item = work_item.schedule_item
         except ScheduleItem.DoesNotExist:
-            return Response({"detail":"Not found"}, status=404)
-        if request.user.role != Roles.ADMIN and si.object.ssk_id != request.user.id:
-            return Response({"detail":"Forbidden: только ССК объекта может изменять статус работ"}, status=403)
+            return Response({"detail": "ScheduleItem not found for this WorkItem"}, status=404)
         
-        ser = WorkItemSetStatusSerializer(data=request.data)
-        ser.is_valid(raise_exception=True)
-        si.status = ser.validated_data["status"]
-        si.save(update_fields=["status","modified_at"])
+        # Проверка доступа к объекту
+        visible_object_ids = _visible_object_ids_for_user(request.user)
+        if work_item.plan.object_id not in visible_object_ids:
+            return Response({"detail": "Forbidden"}, status=403)
         
-        if si.status == "done":
-            log_work_item_completed(si.object.name, si.work_item.name, request.user.full_name, request.user.role)
+        serializer = WorkItemSetStatusSerializer(
+            data=request.data, 
+            context={"request": request, "schedule_item": schedule_item}
+        )
+        serializer.is_valid(raise_exception=True)
         
-        return Response({"status": si.status}, status=200)
+        old_status = schedule_item.status
+        new_status = serializer.validated_data["status"]
+        comment = serializer.validated_data.get("comment", "")
+        
+        # Обновляем статус
+        schedule_item.status = new_status
+        schedule_item.save(update_fields=["status", "modified_at"])
+        
+        # Отправляем уведомления
+        self._send_status_change_notification(work_item, schedule_item, old_status, new_status, comment, request.user)
+        
+        # Логируем завершение работы
+        if new_status == "completed_ssk":
+            log_work_item_completed(work_item.plan.object.name, work_item.name, request.user.full_name, request.user.role)
+        
+        return Response({
+            "message": f"Статус работы '{work_item.name}' изменен с '{dict(ScheduleItem.STATUS_CHOICES)[old_status]}' на '{dict(ScheduleItem.STATUS_CHOICES)[new_status]}'",
+            "status": new_status,
+            "work_item": WorkItemDetailSerializer(work_item).data
+        }, status=200)
+    
+    def _send_status_change_notification(self, work_item, schedule_item, old_status, new_status, comment, user):
+        """Отправляет уведомления при изменении статуса работы"""
+        from api.api.v1.views.utils import send_notification
+        
+        object_name = work_item.plan.object.name
+        work_name = work_item.name
+        
+        try:
+            if new_status == "in_progress":
+                # Уведомление противоположной стороне
+                if user.role == Roles.FOREMAN and work_item.plan.object.ssk:
+                    send_notification(
+                        work_item.plan.object.ssk_id,
+                        work_item.plan.object.ssk.email,
+                        "Работа начата прорабом",
+                        f"Работа '{work_name}' для объекта '{object_name}' начата прорабом.",
+                        user.full_name, user.role
+                    )
+                elif user.role == Roles.SSK and work_item.plan.object.foreman:
+                    send_notification(
+                        work_item.plan.object.foreman_id,
+                        work_item.plan.object.foreman.email,
+                        "Работа начата ССК",
+                        f"Работа '{work_name}' для объекта '{object_name}' начата ССК.",
+                        user.full_name, user.role
+                    )
+            
+            elif new_status == "completed_foreman":
+                # Уведомление ССК
+                if work_item.plan.object.ssk:
+                    send_notification(
+                        work_item.plan.object.ssk_id,
+                        work_item.plan.object.ssk.email,
+                        "Работа завершена прорабом",
+                        f"Работа '{work_name}' для объекта '{object_name}' завершена прорабом. Требуется ваше подтверждение.",
+                        user.full_name, user.role
+                    )
+            
+            elif new_status == "completed_ssk":
+                # Уведомление прорабу
+                if work_item.plan.object.foreman:
+                    send_notification(
+                        work_item.plan.object.foreman_id,
+                        work_item.plan.object.foreman.email,
+                        "Работа окончательно завершена",
+                        f"Работа '{work_name}' для объекта '{object_name}' окончательно завершена ССК.",
+                        user.full_name, user.role
+                    )
+            
+            elif new_status == "in_progress" and old_status == "completed_foreman":
+                # ССК вернул работу в работу
+                if work_item.plan.object.foreman:
+                    send_notification(
+                        work_item.plan.object.foreman_id,
+                        work_item.plan.object.foreman.email,
+                        "Работа возвращена в работу",
+                        f"Работа '{work_name}' для объекта '{object_name}' возвращена ССК в статус 'В работе'.",
+                        user.full_name, user.role
+                    )
+        
+        except Exception as e:
+            # Логируем ошибку, но не прерываем выполнение
+            print(f"Ошибка отправки уведомления: {e}")
 
 
 class WorkItemDetailView(APIView):
@@ -542,3 +630,5 @@ class WorkPlanChangeRequestsListView(APIView):
             "items": WorkItemChangeRequestOutSerializer(page, many=True).data,
             "total": total
         }, status=200)
+
+

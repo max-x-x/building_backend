@@ -44,7 +44,8 @@ class ScheduleItem(TimeStampedMixin):
     STATUS_CHOICES = (
         ("planned", "Запланировано"),
         ("in_progress", "В работе"),
-        ("done", "Выполнено"),
+        ("completed_foreman", "Завершено прорабом"),
+        ("completed_ssk", "Завершено ССК"),
     )
 
     uuid_schedule = models.UUIDField("ID", default=uuid.uuid4, editable=False)
@@ -52,7 +53,7 @@ class ScheduleItem(TimeStampedMixin):
     work_item = models.OneToOneField(WorkItem, verbose_name="Позиция перечня", on_delete=models.CASCADE, related_name="schedule_item")
     planned_start = models.DateField("План. начало")
     planned_end = models.DateField("План. окончание")
-    status = models.CharField("Статус", max_length=16, choices=STATUS_CHOICES, default="planned")
+    status = models.CharField("Статус", max_length=20, choices=STATUS_CHOICES, default="planned")
 
     class Meta:
         verbose_name = "Элемент расписания"

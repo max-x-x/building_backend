@@ -115,7 +115,58 @@ class WorkPlanOutSerializer(serializers.ModelSerializer):
         fields = ("id", "uuid_wp", "object", "title", "created_by", "created_at")
 
 class WorkItemSetStatusSerializer(serializers.Serializer):
-    status = serializers.ChoiceField(choices=["planned","in_progress","done"])
+    status = serializers.ChoiceField(choices=ScheduleItem.STATUS_CHOICES)
+    comment = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, data):
+        request = self.context["request"]
+        schedule_item = self.context["schedule_item"]
+        new_status = data["status"]
+        current_status = schedule_item.status
+        user_role = request.user.role
+        
+        # Валидация переходов между статусами
+        valid_transitions = {
+            "planned": ["in_progress"],
+            "in_progress": ["completed_foreman", "completed_ssk"],
+            "completed_foreman": ["in_progress", "completed_ssk"],
+            "completed_ssk": []  # Финальный статус
+        }
+        
+        if new_status not in valid_transitions.get(current_status, []):
+            raise serializers.ValidationError(f"Невозможно перейти из статуса '{schedule_item.get_status_display()}' в '{dict(ScheduleItem.STATUS_CHOICES)[new_status]}'")
+        
+        # Проверка прав доступа
+        if new_status == "in_progress":
+            if user_role not in [Roles.FOREMAN, Roles.SSK, Roles.ADMIN]:
+                raise serializers.ValidationError("Только прораб или ССК могут переводить работу в статус 'В работе'")
+            
+            # Проверка последовательности работ
+            if current_status == "planned":
+                # Проверяем, что предыдущие работы завершены ССК
+                previous_items = ScheduleItem.objects.filter(
+                    object=schedule_item.object,
+                    planned_start__lt=schedule_item.planned_start
+                ).exclude(status="completed_ssk").exclude(id=schedule_item.id)
+                
+                if previous_items.exists():
+                    raise serializers.ValidationError("Нельзя начать работу, пока предыдущие работы не завершены ССК")
+        
+        elif new_status == "completed_foreman":
+            if user_role not in [Roles.FOREMAN, Roles.ADMIN]:
+                raise serializers.ValidationError("Только прораб может завершить работу")
+            
+            if schedule_item.object.foreman_id != request.user.id and user_role != Roles.ADMIN:
+                raise serializers.ValidationError("Прораб может завершать только работы своих объектов")
+        
+        elif new_status == "completed_ssk":
+            if user_role not in [Roles.SSK, Roles.ADMIN]:
+                raise serializers.ValidationError("Только ССК может окончательно завершить работу")
+            
+            if schedule_item.object.ssk_id != request.user.id and user_role != Roles.ADMIN:
+                raise serializers.ValidationError("ССК может завершать только работы своих объектов")
+        
+        return data
 
 class SubAreaBriefSerializer(serializers.ModelSerializer):
     geometry_type = serializers.SerializerMethodField()
@@ -241,3 +292,5 @@ class WorkPlanChangeDecisionSerializer(serializers.Serializer):
             raise serializers.ValidationError("При редактировании необходимо предоставить отредактированные позиции")
         
         return data
+
+
