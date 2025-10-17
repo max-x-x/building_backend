@@ -26,7 +26,7 @@ class WorkPlanCreateView(APIView):
 class WorkPlanDetailView(APIView):
     def get(self, request, id: int):
         try:
-            wp = WorkPlan.objects.select_related("object","created_by").prefetch_related("items__schedule_item").get(id=id)
+            wp = WorkPlan.objects.select_related("object","created_by").prefetch_related("items__schedule_item", "items__sub_areas").get(id=id)
         except WorkPlan.DoesNotExist:
             return Response({"detail":"Not found"}, status=404)
         if wp.object_id not in _visible_object_ids_for_user(request.user):
@@ -36,7 +36,7 @@ class WorkPlanDetailView(APIView):
 class WorkPlansListView(APIView):
     def get(self, request):
         visible_object_ids = _visible_object_ids_for_user(request.user)
-        qs = WorkPlan.objects.filter(object_id__in=visible_object_ids).select_related("object", "created_by").prefetch_related("items__schedule_item").order_by("-created_at")
+        qs = WorkPlan.objects.filter(object_id__in=visible_object_ids).select_related("object", "created_by").prefetch_related("items__schedule_item", "items__sub_areas").order_by("-created_at")
         
         object_id = request.query_params.get("object_id")
         if object_id:
