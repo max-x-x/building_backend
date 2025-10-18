@@ -317,7 +317,7 @@ class DailyChecklistDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DailyChecklist
-        fields = ("id", "uuid_checklist", "status", "reviewed_by", 
+        fields = ("id", "uuid_daily", "status", "reviewed_by", 
                 "reviewed_at", "created_at", "modified_at")
 
 class ObjectActivationDetailSerializer(serializers.ModelSerializer):
