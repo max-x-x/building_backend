@@ -1,5 +1,6 @@
 import json
 from decimal import Decimal
+from datetime import date, datetime
 from django.db import transaction, models
 from django.db.models import Q
 from rest_framework.views import APIView
@@ -251,18 +252,32 @@ class WorkItemDetailView(APIView):
         return Response(WorkItemDetailSerializer(work_item).data, status=200)
 
 
-def _convert_decimal_for_json(obj):
+def _convert_for_json(obj):
     """
-    Рекурсивно конвертирует Decimal объекты в float для JSON сериализации
+    Рекурсивно конвертирует Decimal и date объекты в JSON-совместимые типы
     """
     if isinstance(obj, Decimal):
         return float(obj)
+    elif isinstance(obj, (date, datetime)):
+        return obj.isoformat()
     elif isinstance(obj, dict):
-        return {key: _convert_decimal_for_json(value) for key, value in obj.items()}
+        return {key: _convert_for_json(value) for key, value in obj.items()}
     elif isinstance(obj, list):
-        return [_convert_decimal_for_json(item) for item in obj]
+        return [_convert_for_json(item) for item in obj]
     else:
         return obj
+
+
+def _parse_date_from_string(date_str):
+    """
+    Парсит дату из строки ISO формата обратно в объект date
+    """
+    if isinstance(date_str, str):
+        try:
+            return datetime.fromisoformat(date_str).date()
+        except (ValueError, TypeError):
+            return date_str
+    return date_str
 
 
 class WorkPlanChangeRequestView(APIView):
@@ -279,9 +294,9 @@ class WorkPlanChangeRequestView(APIView):
             'id', 'name', 'quantity', 'unit', 'start_date', 'end_date', 'document_url'
         ))
         
-        # Конвертируем Decimal объекты для JSON сериализации
-        current_items_converted = _convert_decimal_for_json(current_items)
-        new_items_converted = _convert_decimal_for_json(new_items)
+        # Конвертируем Decimal и date объекты для JSON сериализации
+        current_items_converted = _convert_for_json(current_items)
+        new_items_converted = _convert_for_json(new_items)
         
         changes_analysis = self._analyze_changes(current_items_converted, new_items_converted)
         
@@ -367,8 +382,8 @@ class WorkPlanChangeRequestView(APIView):
                     name=added_item['name'],
                     quantity=added_item.get('quantity'),
                     unit=added_item.get('unit', ''),
-                    start_date=added_item['start_date'],
-                    end_date=added_item['end_date'],
+                    start_date=_parse_date_from_string(added_item['start_date']),
+                    end_date=_parse_date_from_string(added_item['end_date']),
                     document_url=added_item.get('document_url', '')
                 )
                 ScheduleItem.objects.create(
@@ -390,8 +405,8 @@ class WorkPlanChangeRequestView(APIView):
                     work_item.name = new_data['name']
                     work_item.quantity = new_data.get('quantity')
                     work_item.unit = new_data.get('unit', '')
-                    work_item.start_date = new_data['start_date']
-                    work_item.end_date = new_data['end_date']
+                    work_item.start_date = _parse_date_from_string(new_data['start_date'])
+                    work_item.end_date = _parse_date_from_string(new_data['end_date'])
                     work_item.document_url = new_data.get('document_url', '')
                     work_item.save()
                     
