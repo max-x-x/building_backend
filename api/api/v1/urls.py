@@ -1,9 +1,9 @@
 from django.urls import path
 
-from api.api.v1.views.activation import ActivationRequestView, ActivationIkoCheckView
+from api.api.v1.views.activation import ActivationRequestView, ActivationIkoCheckView, ActivationChecklistView
 from api.api.v1.views.auth import (AuthLoginView, AuthRefreshView, AuthLogoutView,
                                    AuthRegisterByInviteView)
-from api.api.v1.views.daily_checklists import DailyChecklistsView, DailyChecklistReviewView
+from api.api.v1.views.daily_checklists import DailyChecklistsView, DailyChecklistReviewView, ObjectDailyChecklistsView
 from api.api.v1.views.deliveries import (DeliveriesCreateView, DeliveryReceiveView, DeliveriesListView,
                                          InvoicesCreateView, DeliverySetStatusView,
                                          LabOrdersCreateView, InvoiceDataReceiveView, DeliveryConfirmView,
@@ -45,6 +45,7 @@ urlpatterns = [
 
     path("objects/<int:id>/activation/request",   ActivationRequestView.as_view(), name="object-activation-request"),
     path("objects/<int:id>/activation/iko-check", ActivationIkoCheckView.as_view(), name="object-activation-iko-check"),
+    path("objects/<int:id>/activation/checklist", ActivationChecklistView.as_view(), name="object-activation-checklist"),
 
     path("objects/<int:id>/suspend",  ObjectSuspendView.as_view(),  name="object-suspend"),
     path("objects/<int:id>/resume",   ObjectResumeView.as_view(),   name="object-resume"),
@@ -75,8 +76,9 @@ urlpatterns = [
     path("work-plans/change-requests", WorkPlanChangeRequestsListView.as_view(), name="work-plan-change-requests-list"),
     path("work-plans/change-requests/<int:change_request_id>/decision", WorkPlanChangeDecisionView.as_view(), name="work-plan-change-decision"),
 
-    path("daily-checklists", DailyChecklistsView.as_view(), name="daily-checklists"),
+    path("daily-checklists",         DailyChecklistsView.as_view(),         name="daily-checklists"),
     path("daily-checklists/<int:id>/review", DailyChecklistReviewView.as_view(), name="daily-checklist-review"),
+    path("objects/<int:id>/daily-checklists", ObjectDailyChecklistsView.as_view(), name="object-daily-checklists"),
 
     path("deliveries", DeliveriesCreateView.as_view(), name="deliveries-create"),
     path("deliveries/<int:id>", DeliveryDetailView.as_view(), name="delivery-detail"),

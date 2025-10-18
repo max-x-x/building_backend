@@ -224,6 +224,7 @@ class ObjectFullDetailView(APIView):
                 "deliveries__work_item",
                 "deliveries__invoices__materials",
                 "work_plans__items__schedule_item",
+                "work_plans__items__sub_areas",
                 "prescriptions",
                 "works",
                 "daily_checklists",

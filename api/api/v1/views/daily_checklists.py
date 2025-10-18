@@ -9,7 +9,7 @@ from api.api.v1.views.objects import _visible_object_ids_for_user, _paginated
 from api.api.v1.views.utils import RoleRequired
 from api.models.object import ConstructionObject
 from api.serializers.daily_checklists import (DailyChecklistCreateSerializer, DailyChecklistOutSerializer,
-                                              DailyChecklistPatchSerializer)
+                                              DailyChecklistPatchSerializer, DailyChecklistListSerializer)
 
 
 class DailyChecklistsView(APIView):
@@ -60,14 +60,32 @@ class DailyChecklistsView(APIView):
     def get(self, request):
         object_id = request.query_params.get("object_id")
         status_q = request.query_params.get("status")
+        
+        date_from = request.query_params.get("date_from")
+        date_to = request.query_params.get("date_to")
+        
         visible = _visible_object_ids_for_user(request.user)
-        qs = DailyChecklist.objects.filter(object_id__in=visible).order_by("-created_at")
+        qs = DailyChecklist.objects.filter(object_id__in=visible).select_related("object", "author", "reviewed_by").order_by("-created_at")
+        
         if object_id:
             qs = qs.filter(object_id=object_id)
         if status_q:
             qs = qs.filter(status=status_q)
+        
+        if date_from:
+            from django.utils.dateparse import parse_datetime
+            dt = parse_datetime(date_from)
+            if dt:
+                qs = qs.filter(created_at__gte=dt)
+        
+        if date_to:
+            from django.utils.dateparse import parse_datetime
+            dt = parse_datetime(date_to)
+            if dt:
+                qs = qs.filter(created_at__lte=dt)
+        
         page, total = _paginated(qs, request)
-        return Response({"items": DailyChecklistOutSerializer(page, many=True).data, "total": total}, status=200)
+        return Response({"items": DailyChecklistListSerializer(page, many=True).data, "total": total}, status=200)
 
     def patch(self, request):
         if request.user.role not in (Roles.FOREMAN, Roles.ADMIN):
@@ -109,3 +127,47 @@ class DailyChecklistReviewView(APIView):
         dc.reviewed_at = timezone.now()
         dc.save(update_fields=["status","review_comment","reviewed_by","reviewed_at"])
         return Response({"status": dc.status, "reviewed_at": dc.reviewed_at}, status=200)
+
+
+class ObjectDailyChecklistsView(APIView):
+    """Ручка для получения ежедневных чек-листов конкретного объекта с фильтрацией по дате"""
+    
+    def get(self, request, id: int):
+        try:
+            obj = ConstructionObject.objects.get(id=id)
+        except ConstructionObject.DoesNotExist:
+            return Response({"detail": "Object not found"}, status=404)
+        
+        visible_object_ids = _visible_object_ids_for_user(request.user)
+        if obj.id not in visible_object_ids:
+            return Response({"detail": "Forbidden"}, status=403)
+        
+        status_q = request.query_params.get("status")
+        date_from = request.query_params.get("date_from")
+        date_to = request.query_params.get("date_to")
+        
+        qs = DailyChecklist.objects.filter(object=obj).select_related("author", "reviewed_by").order_by("-created_at")
+        
+        if status_q:
+            qs = qs.filter(status=status_q)
+        
+        if date_from:
+            from django.utils.dateparse import parse_datetime
+            dt = parse_datetime(date_from)
+            if dt:
+                qs = qs.filter(created_at__gte=dt)
+        
+        if date_to:
+            from django.utils.dateparse import parse_datetime
+            dt = parse_datetime(date_to)
+            if dt:
+                qs = qs.filter(created_at__lte=dt)
+        
+        page, total = _paginated(qs, request)
+        
+        return Response({
+            "object_id": obj.id,
+            "object_name": obj.name,
+            "items": DailyChecklistListSerializer(page, many=True).data,
+            "total": total
+        }, status=200)

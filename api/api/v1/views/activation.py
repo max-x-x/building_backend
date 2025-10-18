@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from api.api.v1.views.utils import RoleRequired, send_notification
 from api.models.user import Roles
 from api.models.object import ConstructionObject, ObjectActivation, ObjectStatus
-from api.serializers.activation import ActivationRequestInSerializer, ActivationOutSerializer, pick_iko
+from api.serializers.activation import ActivationRequestInSerializer, ActivationOutSerializer, ActivationChecklistSerializer, pick_iko
 from api.utils.logging import log_activation_requested, log_activation_approved, log_activation_rejected
 
 
@@ -109,3 +109,27 @@ class ActivationIkoCheckView(APIView):
             except Exception:
                 pass
             return Response(ActivationOutSerializer(act).data, status=200)
+
+
+class ActivationChecklistView(APIView):
+    def get(self, request, id: int):
+        try:
+            obj = ConstructionObject.objects.get(id=id)
+        except ConstructionObject.DoesNotExist:
+            return Response({"detail": "Object not found"}, status=404)
+        
+        allowed = (
+            request.user.role == Roles.ADMIN or
+            request.user.role == Roles.SSK or
+            obj.iko_id == request.user.id or
+            obj.foreman_id == request.user.id
+        )
+        if not allowed:
+            return Response({"detail": "Forbidden"}, status=403)
+        
+        activation = ObjectActivation.objects.filter(object=obj).order_by("-requested_at").first()
+        
+        if not activation:
+            return Response({"detail": "No activation found for this object"}, status=404)
+        
+        return Response(ActivationChecklistSerializer(activation).data, status=200)

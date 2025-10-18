@@ -271,11 +271,12 @@ class DeliveryDetailSerializer(serializers.ModelSerializer):
 
 class WorkItemDetailSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
+    sub_areas = SubAreaBriefSerializer(many=True, read_only=True)
     
     class Meta:
         model = WorkItem
         fields = ("id", "uuid_wi", "name", "quantity", "unit", "start_date", 
-                "end_date", "document_url", "status", "created_at", "modified_at")
+                "end_date", "document_url", "status", "sub_areas", "created_at", "modified_at")
     
     def get_status(self, obj):
         try:
