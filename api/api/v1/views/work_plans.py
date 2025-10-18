@@ -1,3 +1,5 @@
+import json
+from decimal import Decimal
 from django.db import transaction, models
 from django.db.models import Q
 from rest_framework.views import APIView
@@ -249,6 +251,20 @@ class WorkItemDetailView(APIView):
         return Response(WorkItemDetailSerializer(work_item).data, status=200)
 
 
+def _convert_decimal_for_json(obj):
+    """
+    Рекурсивно конвертирует Decimal объекты в float для JSON сериализации
+    """
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {key: _convert_decimal_for_json(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [_convert_decimal_for_json(item) for item in obj]
+    else:
+        return obj
+
+
 class WorkPlanChangeRequestView(APIView):
     
     def post(self, request):
@@ -263,7 +279,11 @@ class WorkPlanChangeRequestView(APIView):
             'id', 'name', 'quantity', 'unit', 'start_date', 'end_date', 'document_url'
         ))
         
-        changes_analysis = self._analyze_changes(current_items, new_items)
+        # Конвертируем Decimal объекты для JSON сериализации
+        current_items_converted = _convert_decimal_for_json(current_items)
+        new_items_converted = _convert_decimal_for_json(new_items)
+        
+        changes_analysis = self._analyze_changes(current_items_converted, new_items_converted)
         
         if request.user.role in [Roles.SSK, Roles.ADMIN]:
             return self._apply_changes_directly(work_plan, changes_analysis, request)
@@ -272,8 +292,8 @@ class WorkPlanChangeRequestView(APIView):
             work_plan=work_plan,
             requested_by=request.user,
             comment=comment,
-            old_items_data=current_items,
-            new_items_data=new_items,
+            old_items_data=current_items_converted,
+            new_items_data=new_items_converted,
             changes_data=changes_analysis
         )
         
