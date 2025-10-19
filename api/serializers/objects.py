@@ -121,7 +121,7 @@ class ObjectOutSerializer(serializers.ModelSerializer):
             import requests
             
             # Формируем URL для запроса истории посещений
-            url = "https://building-qr.itc-hub.ru/api/v1/session-history/list"
+            url = "https://building-qr.itc-hub.ru/api/v1/sessions/list"
             params = {"object_id": obj.id}
             
             if user_filter:
@@ -514,7 +514,7 @@ class ObjectFullDetailSerializer(serializers.ModelSerializer):
             import requests
             
             # Формируем URL для запроса истории посещений
-            url = "https://building-qr.itc-hub.ru/api/v1/session-history/list"
+            url = "https://building-qr.itc-hub.ru/api/v1/sessions/list"
             params = {"object_id": obj.id}
             
             if user_filter:
