@@ -96,7 +96,7 @@ class ObjectsDetailView(APIView):
 
         log_object_viewed(obj.name, request.user.full_name, request.user.role)
 
-        return Response(ObjectOutSerializer(obj).data, status=200)
+        return Response(ObjectOutSerializer(obj, context={'request': request}).data, status=200)
 
     def patch(self, request, id: int):
         try:
@@ -242,4 +242,4 @@ class ObjectFullDetailView(APIView):
         if not allowed:
             return Response({"detail": "Forbidden"}, status=403)
 
-        return Response(ObjectFullDetailSerializer(obj).data, status=200)
+        return Response(ObjectFullDetailSerializer(obj, context={'request': request}).data, status=200)

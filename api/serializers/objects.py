@@ -83,10 +83,11 @@ class ObjectOutSerializer(serializers.ModelSerializer):
     areas = AreaBriefSerializer(many=True, read_only=True)
     main_polygon = serializers.SerializerMethodField()
     work_progress = serializers.SerializerMethodField()
+    visit_history = serializers.SerializerMethodField()
 
     class Meta:
         model = ConstructionObject
-        fields = ("id", "uuid_obj", "name", "address", "status", "ssk", "foreman", "iko", "can_proceed", "areas", "main_polygon", "work_progress", "documents_folder_url", "created_at")
+        fields = ("id", "uuid_obj", "name", "address", "status", "ssk", "foreman", "iko", "can_proceed", "areas", "main_polygon", "work_progress", "documents_folder_url", "visit_history", "created_at")
 
     def get_work_progress(self, obj):
         try:
@@ -106,6 +107,76 @@ class ObjectOutSerializer(serializers.ModelSerializer):
             return int((completed_works / total_works) * 100)
         except Exception:
             return 0
+
+    def get_visit_history(self, obj):
+        """Получает историю посещений объекта"""
+        request = self.context.get('request')
+        if not request:
+            return []
+        
+        # Получаем параметр фильтрации по пользователю
+        user_filter = request.query_params.get('visit_user_id')
+        
+        try:
+            import requests
+            
+            # Формируем URL для запроса истории посещений
+            url = "https://building-qr.itc-hub.ru/api/v1/session-history/list"
+            params = {"object_id": obj.id}
+            
+            if user_filter:
+                params["user_id"] = user_filter
+            
+            # Делаем запрос к внешнему API
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            if data.get("status") != "success":
+                return []
+            
+            visit_history = data.get("history", [])
+            
+            # Получаем все подполигоны объекта для маппинга
+            sub_areas = {}
+            for area in obj.areas.all():
+                for sub_area in area.sub_areas.all():
+                    sub_areas[sub_area.id] = sub_area
+            
+            # Получаем уникальные user_id из посещений
+            user_ids = list(set([visit.get("user_id") for visit in visit_history if visit.get("user_id")]))
+            
+            # Получаем информацию о пользователях из нашей базы данных
+            users = {}
+            if user_ids:
+                from api.models.user import User
+                db_users = User.objects.filter(id__in=user_ids)
+                for user in db_users:
+                    users[str(user.id)] = user
+            
+            # Добавляем информацию о подполигонах и пользователях к каждому посещению
+            enriched_history = []
+            for visit in visit_history:
+                sub_polygon_id = visit.get("sub_polygon_id")
+                if sub_polygon_id and sub_polygon_id in sub_areas:
+                    visit["sub_polygon"] = SubAreaBriefSerializer(sub_areas[sub_polygon_id]).data
+                else:
+                    visit["sub_polygon"] = None
+                
+                user_id = visit.get("user_id")
+                if user_id and user_id in users:
+                    visit["user"] = UserBriefSerializer(users[user_id]).data
+                else:
+                    visit["user"] = None
+                
+                enriched_history.append(visit)
+            
+            return enriched_history
+            
+        except Exception as e:
+            # Логируем ошибку, но не прерываем выполнение
+            print(f"Ошибка получения истории посещений для объекта {obj.id}: {e}")
+            return []
 
     def get_main_polygon(self, obj):
         if obj.areas.exists():
@@ -331,6 +402,18 @@ class ObjectActivationDetailSerializer(serializers.ModelSerializer):
                 "iko_checked_at", "approved_at", "rejected_reason",
                 "created_at", "modified_at")
 
+
+class VisitHistorySerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    user_id = serializers.CharField()
+    object_id = serializers.IntegerField()
+    sub_polygon_id = serializers.IntegerField()
+    date = serializers.DateTimeField()
+    latitude = serializers.FloatField()
+    longitude = serializers.FloatField()
+    sub_polygon = SubAreaBriefSerializer(read_only=True)
+    user = UserBriefSerializer(read_only=True)
+
 class ObjectFullDetailSerializer(serializers.ModelSerializer):
     ssk = UserBriefSerializer(read_only=True)
     foreman = UserBriefSerializer(read_only=True)
@@ -339,6 +422,7 @@ class ObjectFullDetailSerializer(serializers.ModelSerializer):
     areas = AreaBriefSerializer(many=True, read_only=True)
     main_polygon = serializers.SerializerMethodField()
     work_progress = serializers.SerializerMethodField()
+    visit_history = serializers.SerializerMethodField()
 
     deliveries = DeliveryDetailSerializer(many=True, read_only=True)
     work_plans = WorkPlanDetailSerializer(many=True, read_only=True)
@@ -359,7 +443,7 @@ class ObjectFullDetailSerializer(serializers.ModelSerializer):
         fields = (
             "id", "uuid_obj", "name", "address", "status", "can_proceed",
             "ssk", "foreman", "iko", "created_by", "areas", "main_polygon", "work_progress",
-            "documents_folder_url", "created_at", "modified_at",
+            "documents_folder_url", "visit_history", "created_at", "modified_at",
 
             "deliveries", "work_plans", "prescriptions", "works", 
             "daily_checklists", "activations",
@@ -416,3 +500,73 @@ class ObjectFullDetailSerializer(serializers.ModelSerializer):
     
     def get_daily_checklists_count(self, obj):
         return obj.daily_checklists.count()
+    
+    def get_visit_history(self, obj):
+        """Получает историю посещений объекта"""
+        request = self.context.get('request')
+        if not request:
+            return []
+        
+        # Получаем параметр фильтрации по пользователю
+        user_filter = request.query_params.get('visit_user_id')
+        
+        try:
+            import requests
+            
+            # Формируем URL для запроса истории посещений
+            url = "https://building-qr.itc-hub.ru/api/v1/session-history/list"
+            params = {"object_id": obj.id}
+            
+            if user_filter:
+                params["user_id"] = user_filter
+            
+            # Делаем запрос к внешнему API
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            if data.get("status") != "success":
+                return []
+            
+            visit_history = data.get("history", [])
+            
+            # Получаем все подполигоны объекта для маппинга
+            sub_areas = {}
+            for area in obj.areas.all():
+                for sub_area in area.sub_areas.all():
+                    sub_areas[sub_area.id] = sub_area
+            
+            # Получаем уникальные user_id из посещений
+            user_ids = list(set([visit.get("user_id") for visit in visit_history if visit.get("user_id")]))
+            
+            # Получаем информацию о пользователях из нашей базы данных
+            users = {}
+            if user_ids:
+                from api.models.user import User
+                db_users = User.objects.filter(id__in=user_ids)
+                for user in db_users:
+                    users[str(user.id)] = user
+            
+            # Добавляем информацию о подполигонах и пользователях к каждому посещению
+            enriched_history = []
+            for visit in visit_history:
+                sub_polygon_id = visit.get("sub_polygon_id")
+                if sub_polygon_id and sub_polygon_id in sub_areas:
+                    visit["sub_polygon"] = SubAreaBriefSerializer(sub_areas[sub_polygon_id]).data
+                else:
+                    visit["sub_polygon"] = None
+                
+                user_id = visit.get("user_id")
+                if user_id and user_id in users:
+                    visit["user"] = UserBriefSerializer(users[user_id]).data
+                else:
+                    visit["user"] = None
+                
+                enriched_history.append(visit)
+            
+            return enriched_history
+            
+        except Exception as e:
+            # Логируем ошибку, но не прерываем выполнение
+            print(f"Ошибка получения истории посещений для объекта {obj.id}: {e}")
+            return []
